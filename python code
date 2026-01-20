@@ -1,0 +1,132 @@
+import re
+
+def parse_research_data(file_content):
+    """
+    텍스트 파일 내용을 분석하여 3가지 주요 섹션으로 구조화합니다.
+    1. Projective Points (사영 공간 점)
+    2. ILP Constraints (제약 조건)
+    3. Experiment Logs (실험 로그)
+    """
+    data = {
+        "points": [],
+        "constraints": [],
+        "experiments": []
+    }
+    
+    lines = file_content.split('\n')
+    current_section = None
+    current_exp = None
+    
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+
+        # 섹션 감지
+        if line == '[PROJECTIVE_POINTS]':
+            current_section = 'points'
+            continue
+        elif line == '[ILP_CONSTRAINTS]':
+            current_section = 'constraints'
+            continue
+        elif line == '[EXPERIMENT_LOGS]':
+            current_section = 'experiments'
+            continue
+            
+        # 1. 점 데이터 파싱 (P_01 | 1 0 0 | Basis_e1)
+        if current_section == 'points' and '|' in line:
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) >= 2:
+                point_info = {
+                    "id": parts[0],
+                    "vector": parts[1],
+                    "type": parts[2] if len(parts) > 2 else ""
+                }
+                data["points"].append(point_info)
+
+        # 2. 제약 조건 파싱 (C_Length: x_1 + ... )
+        elif current_section == 'constraints' and ':' in line:
+            parts = line.split(':', 1)
+            data["constraints"].append({
+                "name": parts[0].strip(),
+                "expression": parts[1].strip()
+            })
+
+        # 3. 실험 로그 파싱 ([RUN_ID: GA_001] 및 하위 메트릭)
+        elif current_section == 'experiments':
+            if line.startswith('[RUN_ID:'):
+                # 이전 실험 저장
+                if current_exp:
+                    data["experiments"].append(current_exp)
+                # 새 실험 시작
+                run_id = line.replace('[RUN_ID:', '').replace(']', '').strip()
+                current_exp = {"run_id": run_id, "metrics": {}}
+            elif current_exp and ':' in line:
+                key, val = line.split(':', 1)
+                # 숫자형 데이터 변환 시도
+                val = val.strip()
+                try:
+                    if '.' in val:
+                        clean_val = float(re.findall(r"[-+]?\d*\.\d+|\d+", val)[0])
+                    else:
+                        clean_val = int(re.findall(r"\d+", val)[0])
+                except:
+                    clean_val = val # 변환 실패시 문자열 유지
+                
+                current_exp["metrics"][key.strip()] = clean_val
+                
+    # 마지막 실험 저장
+    if current_exp:
+        data["experiments"].append(current_exp)
+        
+    return data
+
+def search_experiments(data, metric_key, min_value=None, max_value=None, status=None):
+    """
+    실험 로그에서 특정 메트릭이나 상태를 기준으로 검색합니다.
+    """
+    results = []
+    for exp in data['experiments']:
+        metrics = exp['metrics']
+        
+        # 상태 조건 (예: FEASIBLE, OPTIMAL_FOUND)
+        if status and status not in str(metrics.get('Status', '')):
+            continue
+            
+        # 수치 조건 (예: Runtime_Log, BZ_Evaluations)
+        if metric_key in metrics:
+            val = metrics[metric_key]
+            if isinstance(val, (int, float)):
+                if min_value is not None and val < min_value:
+                    continue
+                if max_value is not None and val > max_value:
+                    continue
+            results.append(exp)
+            
+    return results
+
+# ==========================================
+# 사용 예시 (파일 내용을 문자열로 가정)
+# ==========================================
+
+# 업로드된 파일 내용을 여기에 로드합니다.
+file_content = """
+[여기에 datashit.txt의 전체 내용을 붙여넣거나 파일 open으로 읽어오세요]
+"""
+
+# 1. 데이터 파싱
+# parsed_data = parse_research_data(file_content)
+
+# 2. 검색 시나리오 예시
+
+# 시나리오 A: 'Basis' 유형의 벡터 포인트 찾기 (선형 대수 기저 벡터 확인)
+# basis_points = [p for p in parsed_data['points'] if 'Basis' in p['type']]
+# print(f"찾은 기저 벡터 수: {len(basis_points)}")
+# for p in basis_points:
+#     print(f"ID: {p['id']}, Vector: {p['vector']}")
+
+# 시나리오 B: BZ_Evaluations(복잡도)가 400 이하인 효율적인 실험 찾기
+# efficient_runs = search_experiments(parsed_data, 'BZ_Evaluations', max_value=400)
+# print(f"\n효율적인 실험 수: {len(efficient_runs)}")
+# for run in efficient_runs:
+#     print(f"Run: {run['run_id']}, BZ_Evals: {run['metrics']['BZ_Evaluations']}, Status: {run['metrics'].get('Status')}")
