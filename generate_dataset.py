@@ -35,7 +35,8 @@ def save_dataset(n, k, q, weights):
     """
     데이터셋 파일 생성
     """
-    base_path = r"c:\Co-AI\dataset"
+    # 현재 실행 중인 스크립트 파일의 위치를 기준으로 dataset 폴더 경로 설정
+    base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
     os.makedirs(base_path, exist_ok=True)
     
     # 1. Projective Space Data 저장
@@ -76,7 +77,7 @@ def load_dataset(n, k, q):
         points (list): 투영 공간의 점 리스트
         constraints (list): 제약 조건 메타데이터 리스트
     """
-    base_path = r"c:\Co-AI\dataset"
+    base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
     points_file = os.path.join(base_path, f"projective_space_k{k}_q{q}.txt")
     ilp_file = os.path.join(base_path, f"ilp_constraints_n{n}_k{k}_q{q}.txt")
     
@@ -106,7 +107,8 @@ def load_dataset(n, k, q):
 
 def main():
     # experiment_parameters.txt 파일을 읽어서 데이터셋 생성
-    param_file = r"c:\Co-AI\dataset\experiment_parameters.txt"
+    base_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
+    param_file = os.path.join(base_path, "experiment_parameters.txt")
     
     if not os.path.exists(param_file):
         print("Parameter file not found. Creating default...")
