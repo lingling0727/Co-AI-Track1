@@ -1,0 +1,114 @@
+# ==============================================================================
+# [RESEARCH METADATA]
+# Project: Linear Code Classification using Hybrid ILP-Heuristic Search
+# Parameters: Field(q)=3, Dimension(k)=3, Length(n)=10
+# Target Weight Spectrum: {6, 9} (Example)
+# Date: 2023-10-27
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. GEOMETRIC ENVIRONMENT (Projective Space Data)
+# ------------------------------------------------------------------------------
+# Description: List of all points in PG(2, 3).
+# Total Points: (3^3 - 1) / (3 - 1) = 13 points.
+#
+# [Condition 1: Normalization]
+# All vectors are normalized such that the first non-zero component is 1.
+# e.g., (2, 0, 1) is equivalent to (1, 0, 2) in GF(3). Only (1, 0, 2) is stored.
+#
+# Format: Point_ID | Vector_Coords | Type
+# ------------------------------------------------------------------------------
+[PROJECTIVE_POINTS]
+P_01 | 1 0 0 | Basis_e1
+P_02 | 0 1 0 | Basis_e2
+P_03 | 0 0 1 | Basis_e3
+P_04 | 1 1 0 | Standard
+P_05 | 1 2 0 | Standard  # Normalized from (2,1,0)
+P_06 | 1 0 1 | Standard
+P_07 | 1 0 2 | Standard
+P_08 | 0 1 1 | Standard
+P_09 | 0 1 2 | Standard
+P_10 | 1 1 1 | Standard
+P_11 | 1 1 2 | Standard
+P_12 | 1 2 1 | Standard
+P_13 | 1 2 2 | Standard
+
+# ------------------------------------------------------------------------------
+# 2. ILP MODELING DATA (Constraints Matrix for Phase 0)
+# ------------------------------------------------------------------------------
+# Description: Linear constraints Ax = b for feasibility checking (Pruning).
+# Variables: x_1 to x_13 correspond to the multiplicity of points P_01 to P_13.
+#
+# [Condition 2: Strict Constraints & Symmetry Breaking]
+# - Rank Constraints: Forces selection of basis vectors to ensure dim = k.
+# - Symmetry Breaking: Lex-Leader constraints (x_1 >= x_2 >= ...) added to
+#   prevent the solver from exploring isomorphic column permutations.
+# ------------------------------------------------------------------------------
+[ILP_CONSTRAINTS]
+# 2.1 Basic Constraints
+C_Length: x_1 + x_2 + ... + x_13 = 10
+
+# 2.2 Rank Constraints (Ensure Dimension k=3)
+C_Rank1: x_1 >= 1
+C_Rank2: x_2 >= 1
+C_Rank3: x_3 >= 1
+
+# 2.3 Hyperplane Constraints (Sample: Weight calculation based on intersection)
+# Hyperplane H1 (x1=0): Points {P_02, P_03, P_08, P_09} lie on H1.
+# Weight w_H1 comes from points NOT on H1.
+C_Hyperplane_1: x_1 + x_4 + x_5 + x_6 + x_7 + x_10 + x_11 + x_12 + x_13 = w_1
+C_Weight_Select: w_1 in {6, 9}  # Only target weights allowed
+
+# 2.4 Symmetry Breaking Inequalities (Static Lex-Leader)
+# Reduces search space by enforcing an order on multiplicities.
+C_SymBreak_1: x_1 >= x_2
+C_SymBreak_2: x_2 >= x_3
+C_SymBreak_3: x_4 >= x_5
+
+# ------------------------------------------------------------------------------
+# 3. HEURISTIC EXPERIMENT METRICS (Evaluation)
+# ------------------------------------------------------------------------------
+# Description: Log data for comparing algorithm performance across 4 researchers.
+#
+# [Condition 3: Hardware-Independent Metrics]
+# - 'BZ_Evaluations': Counts calls to Brouwer-Zimmermann algorithm (costly).
+# - 'Nodes_Explored': Search tree size.
+# These allow fair comparison regardless of CPU speed.
+# ------------------------------------------------------------------------------
+[EXPERIMENT_LOGS]
+
+# --- Experiment 1: Genetic Algorithm (Researcher A) ---
+[RUN_ID: GA_001]
+Parameters: {Population: 100, Mutation_Rate: 0.05, Crossover: OnePoint}
+Seed: 12345_FIXED
+Result_Metrics:
+  Runtime_Log (sec): 45.2
+  Node_Count (Lattice Points): 1540
+  BZ_Evaluations: 320          # Critical metric for efficiency
+  Success_Rate (%): 85.0
+  Found_Code_ID: Code_Alpha_1
+  Status: FEASIBLE
+
+# --- Experiment 2: Simulated Annealing (Researcher B) ---
+[RUN_ID: SA_001]
+Parameters: {Init_Temp: 1000, Cooling_Rate: 0.95}
+Seed: 67890_FIXED
+Result_Metrics:
+  Runtime_Log (sec): 52.1
+  Node_Count (Lattice Points): 2100
+  BZ_Evaluations: 450
+  Success_Rate (%): 72.5
+  Found_Code_ID: NULL
+  Status: INFEASIBLE_PRUNED    # Pruned by Phase 0 ILP check
+
+# --- Experiment 3: Hybrid ILP + Local Search (Researcher C) ---
+[RUN_ID: HYBRID_001]
+Parameters: {ILP_Timeout: 10s, Heuristic_Depth: 5}
+Seed: 11223_FIXED
+Result_Metrics:
+  Runtime_Log (sec): 28.4
+  Node_Count (Lattice Points): 850
+  BZ_Evaluations: 110          # Most efficient method
+  Success_Rate (%): 92.0
+  Found_Code_ID: Code_Gamma_9
+  Status: OPTIMAL_FOUND
