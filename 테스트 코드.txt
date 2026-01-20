@@ -1,0 +1,137 @@
+import itertools
+import ast
+import os
+
+def generate_projective_points(k, q):
+    """
+    Step 1: 기하학적 환경 준비 (Projective Space Data)
+    PG(k-1, q)의 모든 점을 생성합니다.
+    각 점은 첫 번째 0이 아닌 성분이 1인 벡터로 정규화됩니다.
+    """
+    points = []
+    # 0부터 q-1까지의 숫자로 만들 수 있는 길이 k의 모든 벡터 생성
+    for vector in itertools.product(range(q), repeat=k):
+        # 영벡터 제외
+        if all(x == 0 for x in vector):
+            continue
+        
+        # 정규화 (Projective Equivalence)
+        # 첫 번째 0이 아닌 성분을 찾아서 그 역수를 곱함 (mod q 연산 필요하지만, 
+        # 여기서는 데이터셋 포맷 예시를 위해 첫 성분이 1인 것만 필터링하는 방식으로 단순화)
+        # 실제 유한체 연산 라이브러리 대신 정수 튜플로 표현
+        
+        first_nonzero = next((x for x in vector if x != 0), None)
+        
+        # 표준형: 첫 0이 아닌 숫자가 1이어야 함 (유한체 스칼라 곱에 대한 대표원)
+        # 간단한 생성을 위해 여기서는 정수 그대로 처리하되, 
+        # 실제 구현시에는 GF(q) 라이브러리 사용 권장.
+        # 여기서는 데이터셋 '형식'을 보여주기 위해 첫 nonzero가 1인 경우만 저장.
+        if first_nonzero == 1:
+            points.append(vector)
+            
+    return points
+
+def save_dataset(n, k, q, weights):
+    """
+    데이터셋 파일 생성
+    """
+    base_path = r"c:\Co-AI\dataset"
+    os.makedirs(base_path, exist_ok=True)
+    
+    # 1. Projective Space Data 저장
+    points = generate_projective_points(k, q)
+    points_filename = os.path.join(base_path, f"projective_space_k{k}_q{q}.txt")
+    
+    with open(points_filename, "w", encoding="utf-8") as f:
+        f.write(f"# Projective Space PG({k-1}, {q})\n")
+        f.write(f"# Total Points: {len(points)}\n")
+        f.write("ID\tVector\n")
+        for idx, point in enumerate(points):
+            f.write(f"{idx}\t{point}\n")
+    
+    print(f"[Generated] {points_filename}")
+
+    # 2. ILP Constraints Matrix (Phase 0 Data) 저장
+    # 실제 A행렬은 부호 이론의 무게 조건에 따라 생성되지만, 
+    # 여기서는 데이터셋 '형식'을 맞추기 위해 더미 데이터를 생성합니다.
+    ilp_filename = os.path.join(base_path, f"ilp_constraints_n{n}_k{k}_q{q}.txt")
+    
+    with open(ilp_filename, "w", encoding="utf-8") as f:
+        f.write(f"# ILP Constraints for Code [n={n}, k={k}, q={q}]\n")
+        f.write(f"# Target Weights: {weights}\n")
+        f.write("# Format: A * x = b (Rows: Constraints, Cols: Point IDs)\n")
+        f.write("# Constraint_ID\tCoefficients(PointID:Val,...)\tRHS_Value\n")
+        
+        # 예시 제약 조건 (연구보고서의 무게 조건, 형태 조건 등)
+        # 실제로는 모든 점에 대해 복잡한 계산이 필요함.
+        f.write("0\t0:1, 1:1, 2:1, ...\t" + str(n) + "  # Total Length Constraint\n")
+        f.write("1\t0:1, 5:1, 10:1, ...\t" + str(min(weights)) + "  # Min Weight Constraint\n")
+        
+    print(f"[Generated] {ilp_filename}")
+
+def load_dataset(n, k, q):
+    """
+    생성된 데이터셋 파일을 읽어서 메모리로 로드하는 함수 (실험 코드에서 사용)
+    Returns:
+        points (list): 투영 공간의 점 리스트
+        constraints (list): 제약 조건 메타데이터 리스트
+    """
+    base_path = r"c:\Co-AI\dataset"
+    points_file = os.path.join(base_path, f"projective_space_k{k}_q{q}.txt")
+    ilp_file = os.path.join(base_path, f"ilp_constraints_n{n}_k{k}_q{q}.txt")
+    
+    if not os.path.exists(points_file) or not os.path.exists(ilp_file):
+        raise FileNotFoundError(f"Dataset for (n={n}, k={k}, q={q}) not found. Run generate_dataset.py first.")
+
+    # 1. Load Points
+    points = []
+    with open(points_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.startswith("#") or "ID\tVector" in line: continue
+            parts = line.strip().split('\t')
+            if len(parts) >= 2:
+                # 문자열 벡터 "(0, 0, 1)"을 실제 튜플/리스트로 변환
+                points.append(ast.literal_eval(parts[1]))
+
+    # 2. Load Constraints (Metadata)
+    constraints = []
+    with open(ilp_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.startswith("#") or "Constraint_ID" in line: continue
+            # 실제 파싱 로직은 솔버 구현 시 구체화
+            constraints.append(line.strip())
+            
+    print(f"[Loaded] Dataset n={n}, k={k}, q={q} (Points: {len(points)})")
+    return points, constraints
+
+def main():
+    # experiment_parameters.txt 파일을 읽어서 데이터셋 생성
+    param_file = r"c:\Co-AI\dataset\experiment_parameters.txt"
+    
+    if not os.path.exists(param_file):
+        print("Parameter file not found. Creating default...")
+        # (위의 diff로 생성되겠지만, 스크립트 단독 실행을 위해 예외처리)
+        os.makedirs(os.path.dirname(param_file), exist_ok=True)
+        with open(param_file, "w") as f:
+            f.write("# Format: n, k, q, weight_spectrum\n")
+            f.write("34, 3, 8, {28, 32}\n")
+            f.write("76, 4, 4, {56, 64}\n")
+            f.write("7, 3, 2, {3, 4}\n")
+
+    with open(param_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            
+            # 파싱
+            parts = line.split(",")
+            n = int(parts[0].strip())
+            k = int(parts[1].strip())
+            q = int(parts[2].strip())
+            weights = parts[3].strip().replace("{", "").replace("}", "")
+            
+            save_dataset(n, k, q, weights)
+
+if __name__ == "__main__":
+    main()
