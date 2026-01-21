@@ -1,0 +1,5 @@
+Timestamp,n,k,q,Weights,Points,Incidence_Size,Allowed_Variables_Count,Seed,ILP_Status,ILP_Time,Heuristic_Status,Heuristic_Time,Heuristic_Cost,Heuristic_MaxIter,Heuristic_Temp,Heuristic_CoolRate,Hybrid_Status,Hybrid_Time
+2026-01-21 05:23:49,34,3,8,"{28, 32}",73,73x73,21,1402016181,Feasible,3.6482,Fail,0.9503,8,5000,100.0,0.995,Hybrid-Infeasible,0.3666
+2026-01-21 05:23:54,76,4,4,"{56, 64}",85,85x85,25,950899567,Feasible,1.4813,Fail,2.7448,16,5000,100.0,0.995,Hybrid-Infeasible,0.9137
+2026-01-21 05:23:54,20,3,3,"{12, 15}",13,13x13,13,965522450,Feasible,0.004,Success,0.0009,0,5000,100.0,0.995,Optimal (Heuristic),0.002
+2026-01-21 05:23:54,7,3,2,"{4, 5}",7,7x7,7,1903005090,Feasible,0.0026,Success,0.0029,0,5000,100.0,0.995,Optimal (Heuristic),0.0015

@@ -1,0 +1,7 @@
+# Format: n, k, q, weight_spectrum
+# Case 1: Research Report p.1 (Non-existence proof)
+34, 3, 8, {28, 32}
+# Case 2: Research Report p.1 (Large scale classification)
+76, 4, 4, {56, 64}
+# Case 3: Toy Example (Fano Plane, for debugging)
+7, 3, 2, {3, 4}
