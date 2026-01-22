@@ -1,6 +1,6 @@
 # experiment_results.csv — 설명서
 
-이 문서는 `experiment_results.csv`의 열(column) 의미와 분석 시 주의사항을 간단히 정리합니다.
+`experiment_results.csv`의 열(column) 의미와 분석 시 주의사항
 
 파일 구조(열 순서)
 
@@ -27,19 +27,19 @@
 
 해석 가이드(간단)
 
-- 시간 단위는 초(seconds)입니다. ILP/Hybrid 시간이 지나치게 길면 `solve_ilp`에 시간 제한을 설정하세요.
-- `Heuristic_Status == Success`이면 `Heuristic_Cost`는 0이며, 하이브리드 단계에서 ILP를 건너뛸 수 있습니다.
-- `Allowed_Variables_Count`는 하이브리드에서 ILP에 전달된 변수 개수로, 작을수록 ILP가 더 빨리 풀릴 가능성이 높습니다.
-- `Seed`를 기록하면 동일 파라미터로 실험을 재현할 수 있습니다(재현하려면 코드가 해당 시드를 사용하도록 해야 함).
+- 시간 단위는 초(seconds)입니다. ILP/Hybrid 시간이 지나치게 길면 `solve_ilp`에 시간 제한을 설정
+- `Heuristic_Status == Success`이면 `Heuristic_Cost`는 0이며, 하이브리드 단계에서 ILP를 건너뛸 수 있음
+- `Allowed_Variables_Count`는 하이브리드에서 ILP에 전달된 변수 개수로, 작을수록 ILP가 더 빨리 풀릴 가능성이 높음 
+- `Seed`를 기록하면 동일 파라미터로 실험을 재현할 수 있음.(재현하려면 코드가 해당 시드를 사용하도록 해야 함).
 
 주의/검증
 
-- CSV 열/헤더가 변경되면 분석 파이프라인(스크립트)이 실패할 수 있으므로 헤더와 필드 매핑을 확인하세요.
-- 데이터셋(`dataset/projective_space_k{k}_q{q}.txt`)의 정합성(점 수, 중복, 좌표 범위)은 `generate_dataset.py`의 검증 기능에서 자동으로 검사합니다. 검증 실패 시 `main.py` 실행 로그에 경고/에러가 출력됩니다.
+- CSV 열/헤더가 변경되면 분석 파이프라인(스크립트)이 실패할 수 있으므로 헤더와 필드 매핑을 확인
+- 데이터셋(`dataset/projective_space_k{k}_q{q}.txt`)의 정합성(점 수, 중복, 좌표 범위)은 `generate_dataset.py`의 검증 기능에서 자동으로 검사합니다. 검증 실패 시 `main.py` 실행 로그에 경고/에러가 출력됨 
 
 권장 후속작업
 
-- 결과를 자동으로 요약하는 스크립트(예: 성공률, 평균 시간, n 대비 스케일링)를 추가하면 분석이 편해집니다.
+- 결과를 자동으로 요약하는 스크립트(예: 성공률, 평균 시간, n 대비 스케일링)를 추가하면 분석이 편해짐
 - ILP 시간 제한 및 휴리스틱 다중 시작을 실험 파라미터로 두어 재실험을 쉽게 하세요.
 
 예시 행
