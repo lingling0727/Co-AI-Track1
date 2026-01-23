@@ -1,0 +1,12 @@
+=== [Scenario 1] Balanced Configuration (Precision 0.6 / Speed 0.4) ===
+ilp_solver_timeout_per_call_sec: 108.0
+ilp_relative_gap_tolerance: 0.005
+lattice_enumeration_max_depth: 50
+lattice_pruning_aggressiveness: 0.6
+...
+
+=== [Scenario 2] Speed Priority Configuration (Speed 0.9) ===
+lattice_pruning_aggressiveness: 0.7200000000000001
+phase2_check_granularity: low
+ilp_solver_timeout_per_call_sec: 108.0
+...
