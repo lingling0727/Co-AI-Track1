@@ -4,7 +4,7 @@
 # k: 3, q: 3
 # Expected Points: 13
 # Total Points: 13
-ID	Vector	Incidence_BitString (행렬을 비트화)
+ID	Vector	Incidence_BitString
 0	(0, 0, 1)	0100100100100
 1	(0, 1, 0)	1000111000000
 2	(0, 1, 1)	0001100001010
