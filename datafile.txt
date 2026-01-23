@@ -1,0 +1,21 @@
+=== 1. Code Properties (수학적 제약 조건) ===
+n: 66
+k: 5
+q: 4
+weights: [48, 56]
+is_projective: True
+divisible_by_delta: True
+delta: 8
+min_weight_a: 6  # (48/8)
+max_weight_b: 7  # (56/8)
+
+=== 2. Efficiency Settings (알고리즘 효율성 설정) ===
+lattice_pruning_factor: 0.85  # 가지치기 강도 (0.8~1.0)
+ilp_solver_tolerance: 0.0005  # ILP 오차 허용 범위
+use_ilp_in_phase0: True       # 초기 단계 ILP 사용 여부
+phase0_ilp_constraints: ['canonical_length_extension_check', 'gaps_in_weight_spectrum_check']
+
+=== 3. Resource Constraints (자원 제약) ===
+max_computation_time_sec: 7200  # 제한 시간 (초)
+num_cores: 16                   # CPU 코어 수
+max_memory_gb: 32               # 메모리 제한 (GB)
