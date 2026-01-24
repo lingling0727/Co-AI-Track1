@@ -159,7 +159,7 @@ def solve_and_save_csv():
     df = pd.DataFrame(results_data)
     csv_filename = "proposition2_result.csv"
     df.to_csv(csv_filename, index=False)
-    print(f"✅ Results saved to '{csv_filename}'")
+    print(f" Results saved to '{csv_filename}'")
     print(df)
 
 if __name__ == "__main__":
