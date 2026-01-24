@@ -1,0 +1,106 @@
+# ============================================================
+# Case 1: [33,2,{28,32}]_8  (PG(1,8) 기반 x_P 모델)
+# - k=2이므로 hyperplane은 '점 1개'이고, weight는 n - x_P
+# - {28,32} weight 조건 -> x_P in {5,1}
+# - sum x_P = 33, |PG(1,8)| = 9 -> 5가 6개, 1이 3개 (동형까지 유일)
+# ============================================================
+
+from itertools import combinations
+
+# -------- GF(8) 구현 (GF(2^3), primitive poly: x^3 + x + 1) --------
+# 원소는 0..7 정수로 표현 (비트가 다항식 계수)
+PRIM_POLY = 0b1011  # x^3 + x + 1
+
+def gf8_add(a, b):
+    return a ^ b
+
+def gf8_mul(a, b):
+    res = 0
+    aa = a
+    bb = b
+    while bb:
+        if bb & 1:
+            res ^= aa
+        bb >>= 1
+        aa <<= 1
+        if aa & 0b1000:  # x^3 항 생기면 primitive poly로 reduction
+            aa ^= PRIM_POLY
+        aa &= 0b1111
+    return res & 0b111
+
+def gf8_pow(a, e):
+    res = 1
+    for _ in range(e):
+        res = gf8_mul(res, a)
+    return res
+
+def gf8_inv(a):
+    if a == 0:
+        raise ZeroDivisionError("0 has no inverse in GF(8)")
+    # GF(8)^*는 크기 7이므로 a^(7-1)=a^6 = a^{-1}
+    return gf8_pow(a, 6)
+
+# -------- PG(1,8) 점 만들기: [1:t] (t in GF(8)) 와 [0:1] --------
+def pg1_points_gf8():
+    points = []
+    # [1:t]
+    for t in range(8):
+        points.append((1, t))
+    # [0:1]
+    points.append((0, 1))
+    return points  # 총 9개
+
+# -------- 생성행렬 G 구성 (k=2): 각 점을 열벡터로 두고 multiplicity만큼 반복 --------
+def build_generator_matrix_case1(points, x):
+    # points: list of (a,b) representing projective point [a:b]
+    # x: multiplicity list same length
+    cols = []
+    for (a, b), mult in zip(points, x):
+        for _ in range(mult):
+            cols.append((a, b))
+    # G는 2 x n, 원소는 GF(8)
+    # 여기서는 "열 리스트" 형태로 반환
+    return cols
+
+def compute_weight_set_case1(x, n=33):
+    # k=2에서는 hyperplane이 점 1개 -> weight = n - x_P
+    return sorted(set(n - xi for xi in x if xi > 0))
+
+def enumerate_solutions_case1():
+    points = pg1_points_gf8()
+    m = len(points)  # 9
+    n = 33
+    target_weights = {28, 32}
+
+    sols = []
+    # 1이 될 3개 점을 고르면 나머지는 5 (앞서 유도된 유일 형태)
+    for ones_idx in combinations(range(m), 3):
+        x = [5] * m
+        for i in ones_idx:
+            x[i] = 1
+        # 검증: 합
+        if sum(x) != n:
+            continue
+        # weight set 검증
+        wset = set(n - xi for xi in x)
+        if wset == target_weights:
+            sols.append(x)
+
+    return points, sols
+
+if __name__ == "__main__":
+    points, sols = enumerate_solutions_case1()
+    print(f"[Case1] 후보 해 개수(라벨링 그대로): {len(sols)}")
+    # 이 값은 조합(9 choose 3)=84로 나올 것(라벨까지 세면 84개)
+
+    # 대표 해 하나 출력 + 생성행렬(열) 구성
+    x0 = sols[0]
+    print("[Case1] 대표 해 x_P:", x0)
+    print("[Case1] weight set:", compute_weight_set_case1(x0, n=33))
+
+    G_cols = build_generator_matrix_case1(points, x0)
+    print(f"[Case1] 생성행렬 열 개수(n): {len(G_cols)}")
+    print("[Case1] 앞 10개 열(프로젝트 점):", G_cols[:10])
+
+    # 동형(=PGL(2,8) 작용)까지 유일성은 이론적으로 3-전이에서 바로 나옴
+    print("[Case1] 결론: '1이 찍힌 3점 집합'은 3-전이 때문에 동형까지 유일.")
