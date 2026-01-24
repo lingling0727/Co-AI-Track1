@@ -1,0 +1,2 @@
+Method,Length(n),Dimension(k),Field(q),Target_Weights,Search_Time(s),Nodes_Visited,Status,Note
+Proposition 2 (Highs),35,4,8,"[28, 32]",0.0248925999999301,0,Infeasible,Solved via ILP Extension
