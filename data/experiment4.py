@@ -176,3 +176,6 @@ class CustomSolverProp4:
 # 실행
 solver = CustomSolverProp4()
 solver.solve()
+
+
+# 이거 phrase1에 준원이 방법론 섞어서 했는데 실행시간 10분 넘게 걸림.
