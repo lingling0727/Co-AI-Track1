@@ -3,13 +3,11 @@ import numpy as np
 
 class GF8:
     """
-    Galois Field GF(8) implementation for Projective Geometry generation.
-    Primitive polynomial: x^3 + x + 1
-    Elements mapped to integers 0..7
+    Galois Field GF(8) 구현 (x^3 + x + 1)
     """
     def __init__(self):
         self.size = 8
-        self.prim_poly = 0b1011  # x^3 + x + 1
+        self.prim_poly = 0b1011
         self.exp = [0] * 8
         self.log = [0] * 8
         
@@ -20,8 +18,7 @@ class GF8:
             x <<= 1
             if x & 0b1000:
                 x ^= self.prim_poly
-        self.exp[7] = 0 # Convention? Usually cycle is 0..6. 0 is separate.
-        # Handling 0 separately in arithmetic
+        self.exp[7] = 0
         
     def add(self, a, b):
         return a ^ b
@@ -43,33 +40,29 @@ class ProjectiveGeometry:
         self.q = q
         self.gf = gf
         self.points = self._generate_points()
-        self.hyperplanes = self.points # In PG(n, q), points and hyperplanes are dual isomorphic
+        self.hyperplanes = self.points
         
     def _generate_points(self):
-        """Generate canonical representatives for projective points"""
         points = []
         max_val = self.q ** self.k
         seen = set()
         
         for i in range(1, max_val):
-            # Convert integer to vector
             vec = []
             temp = i
             for _ in range(self.k):
                 vec.append(temp % self.q)
                 temp //= self.q
-            vec = vec[::-1] # Big-endian
+            vec = vec[::-1]
             
-            # Normalize (first non-zero must be 1)
             first_nonzero = -1
             for idx, val in enumerate(vec):
                 if val != 0:
                     first_nonzero = idx
                     break
             
-            if first_nonzero == -1: continue # Zero vector
+            if first_nonzero == -1: continue
             
-            # Scale to make first non-zero 1
             inv = self.gf.exp[(7 - self.gf.log[vec[first_nonzero]]) % 7]
             norm_vec = tuple(self.gf.mul(x, inv) for x in vec)
             
@@ -79,7 +72,6 @@ class ProjectiveGeometry:
         return sorted(list(points))
 
     def get_incidence_matrix(self):
-        """Returns matrix A where A[h][p] = 1 if point p is on hyperplane h"""
         num_items = len(self.points)
         matrix = np.zeros((num_items, num_items), dtype=int)
         
@@ -90,7 +82,7 @@ class ProjectiveGeometry:
         return matrix
 
 def solve_proposition2():
-    print("=== Setting up Proposition 2 Experiment ===")
+    print("=== Setting up Proposition 2 Experiment (Fixed API) ===")
     
     # 1. Parameters
     q = 8
@@ -113,64 +105,49 @@ def solve_proposition2():
     h = highspy.Highs()
     h.setOptionValue("output_flag", True)
     
-    # Variables: x_P for each point P in PG(3, 8)
-    # x_P is binary because the code is Projective
-    x_vars = []
+    # --- [수정됨] 변수 추가 부분 ---
+    # h.addVar(lb, ub)로 호출 후, changeColIntegrality로 정수형 설정
+    
+    # Variables x_P (0 to num_points-1)
     for i in range(num_points):
-        h.addVar(lb=0, ub=1, type=highspy.HighsVarType.kInteger) # Binary
-        x_vars.append(i) # Storing indices
-        
-    # Variables: y_H for each hyperplane H (Slack/Integer multiplier)
-    # Eq (3): 4 * y_H + Sum(x_P) = n - a*Delta = 35 - 28 = 7
-    # Since sum(x_P) >= 0, y_H must be <= 7/4 -> y_H in {0, 1}
-    y_vars = []
-    for i in range(num_points): # Number of hyperplanes = Number of points
-        h.addVar(lb=0, ub=1, type=highspy.HighsVarType.kInteger)
-        y_vars.append(num_points + i)
+        h.addVar(0.0, 1.0) # Lower bound 0, Upper bound 1
+        h.changeColIntegrality(i, highspy.HighsVarType.kInteger)
+
+    # Variables y_H (num_points to 2*num_points-1)
+    offset = num_points
+    for i in range(num_points):
+        h.addVar(0.0, 1.0) # Lower bound 0, Upper bound 1
+        h.changeColIntegrality(offset + i, highspy.HighsVarType.kInteger)
 
     # Constraint 1: Weight Divisibility & Bounds (Eq 3)
-    # 4 * y_H + sum(x_P on H) = 7
-    rhs_value = target_n - min_weight # 35 - 28 = 7
+    rhs_value = float(target_n - min_weight) # 7.0
     
     print("Adding Hyperplane Constraints...")
     for h_idx in range(num_points):
-        # Gather indices of points on this hyperplane
         p_indices = np.where(incidence[h_idx] == 1)[0]
         
-        # Coeffs: 1 for x_P, 4 for y_H
-        col_indices = list(p_indices) + [y_vars[h_idx]]
+        col_indices = list(p_indices) + [offset + h_idx]
+        col_indices = [int(x) for x in col_indices] # int 형변환
         coeffs = [1.0] * len(p_indices) + [float(divisibility)]
         
-        h.addRow(lb=rhs_value, ub=rhs_value, num_new_nz=len(col_indices), indices=col_indices, values=coeffs)
+        # [수정됨] addRow에 위치 인자 사용 (lb, ub, num_nz, indices, values)
+        h.addRow(rhs_value, rhs_value, len(col_indices), col_indices, coeffs)
 
-    # Constraint 2: Extension Constraints (Lemma 1, Eq 4)
-    # Determine the columns of the seed code [34, 3]
-    # We need to map PG(3, 8) points to PG(2, 8) points by projection.
-    # P = (v1, v2, v3, v4) -> u = (v1, v2, v3)
-    
+    # Constraint 2: Extension Constraints
     print("Adding Extension Constraints (Projection to Seed Code)...")
     
     # --- MOCK DATA FOR SEED CODE ---
-    # In a real experiment, this comes from the solved [34, 3] code.
-    # Here we assume a uniform-ish distribution just to make the code runnable structure-wise.
-    # PG(2, 8) has 73 points. n=34.
+    # 실제 실험 시에는 [34, 3] 코드의 실제 분포 데이터가 필요합니다.
     num_points_pg2 = 73 
     seed_multiplicities = [0] * num_points_pg2
-    # Just filling some random slots to sum to 34 for demonstration
-    # (This will likely make the problem INFEASIBLE quickly, which aligns with the proof goal)
     for i in range(34):
         seed_multiplicities[i % num_points_pg2] += 1
     # -------------------------------
 
-    pg2 = ProjectiveGeometry(3, q, gf) # PG(2, 8) for mapping
+    pg2 = ProjectiveGeometry(3, q, gf)
     pg2_points = pg2.points
     
-    # Mapping logic: Group PG(3,8) points by their projection to PG(2,8)
-    # The last coordinate v4 is dropped.
-    
-    # Case A: u = 0 (v1=v2=v3=0). This corresponds to P=(0,0,0,1).
-    # Lemma 1 says c(0) = r. Here r = 35 - 34 = 1.
-    # So x_(0,0,0,1) must be 1.
+    # Case A: u = 0 (v1=v2=v3=0) -> P=(0,0,0,1)
     p_zero_idx = -1
     for i, p in enumerate(points):
         if p == (0,0,0,1):
@@ -178,28 +155,22 @@ def solve_proposition2():
             break
     
     if p_zero_idx != -1:
-        h.addRow(lb=1, ub=1, num_new_nz=1, indices=[p_zero_idx], values=[1.0])
+        # x_P = 1
+        h.addRow(1.0, 1.0, 1, [int(p_zero_idx)], [1.0])
     
-    # Case B: u != 0. Sum of x_P projecting to u must equal c(u).
-    # We iterate over each unique point u in PG(2, 8)
+    # Case B: u != 0
     for u_idx, u_vec in enumerate(pg2_points):
-        target_count = seed_multiplicities[u_idx]
+        target_count = float(seed_multiplicities[u_idx])
         
-        # Find all P in PG(3, 8) that project to u_vec (up to scaling)
-        # P projects to u if (p1, p2, p3) = lambda * (u1, u2, u3)
         relevant_p_indices = []
-        
         for p_idx, p_vec in enumerate(points):
-            # Extract first 3 coords
             proj = p_vec[:3]
             if all(x==0 for x in proj): continue
             
-            # Check if proj is scalar multiple of u_vec
-            # Use the first non-zero of u_vec to find lambda
             first_nz = next((i for i, x in enumerate(u_vec) if x != 0), None)
             if first_nz is None: continue 
             
-            lambda_val = gf.mul(proj[first_nz], gf.exp[(7 - gf.log[u_vec[first_nz]])%7]) # proj / u
+            lambda_val = gf.mul(proj[first_nz], gf.exp[(7 - gf.log[u_vec[first_nz]])%7])
             
             is_multiple = True
             for k in range(3):
@@ -210,11 +181,10 @@ def solve_proposition2():
             if is_multiple:
                 relevant_p_indices.append(p_idx)
                 
-        # Add constraint: sum(x_P) == c(u)
         if relevant_p_indices:
             coeffs = [1.0] * len(relevant_p_indices)
-            h.addRow(lb=target_count, ub=target_count, num_new_nz=len(relevant_p_indices), 
-                     indices=relevant_p_indices, values=coeffs)
+            col_idx_list = [int(x) for x in relevant_p_indices]
+            h.addRow(target_count, target_count, len(col_idx_list), col_idx_list, coeffs)
 
     # 4. Solve
     print("Solving ILP...")
@@ -224,11 +194,4 @@ def solve_proposition2():
     print(f"Solver Status: {status}")
     
     if status == highspy.HighsModelStatus.kOptimal:
-        print("Solution Found! (Extension exists - contradicts proposition?)")
-    elif status == highspy.HighsModelStatus.kInfeasible:
-        print("Infeasible! (Proposition 2 Proved: No extension exists)")
-    else:
-        print(f"Other status: {status}")
-
-if __name__ == "__main__":
-    solve_proposition2()
+        print("
