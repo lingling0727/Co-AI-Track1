@@ -3,7 +3,7 @@ import numpy as np
 
 class GF8:
     """
-    Galois Field GF(8) 구현 (x^3 + x + 1)
+    Galois Field GF(8) implementation (Primitive polynomial: x^3 + x + 1)
     """
     def __init__(self):
         self.size = 8
@@ -105,21 +105,22 @@ def solve_proposition2():
     h = highspy.Highs()
     h.setOptionValue("output_flag", True)
     
-    # --- [수정됨] 변수 추가 부분 ---
-    # h.addVar(lb, ub)로 호출 후, changeColIntegrality로 정수형 설정
+    # --- [수정 포인트 1] addVar 사용법 변경 ---
+    # 키워드 인자(lb=, ub=) 제거 -> 위치 인자(0.0, 1.0) 사용
+    # type 인자 제거 -> changeColIntegrality 함수로 별도 설정
     
     # Variables x_P (0 to num_points-1)
     for i in range(num_points):
-        h.addVar(0.0, 1.0) # Lower bound 0, Upper bound 1
+        h.addVar(0.0, 1.0) 
         h.changeColIntegrality(i, highspy.HighsVarType.kInteger)
 
     # Variables y_H (num_points to 2*num_points-1)
     offset = num_points
     for i in range(num_points):
-        h.addVar(0.0, 1.0) # Lower bound 0, Upper bound 1
+        h.addVar(0.0, 1.0)
         h.changeColIntegrality(offset + i, highspy.HighsVarType.kInteger)
 
-    # Constraint 1: Weight Divisibility & Bounds (Eq 3)
+    # Constraint 1: Weight Divisibility & Bounds
     rhs_value = float(target_n - min_weight) # 7.0
     
     print("Adding Hyperplane Constraints...")
@@ -127,17 +128,18 @@ def solve_proposition2():
         p_indices = np.where(incidence[h_idx] == 1)[0]
         
         col_indices = list(p_indices) + [offset + h_idx]
-        col_indices = [int(x) for x in col_indices] # int 형변환
+        # 인덱스는 반드시 int, 계수는 float여야 함
+        col_indices = [int(x) for x in col_indices] 
         coeffs = [1.0] * len(p_indices) + [float(divisibility)]
         
-        # [수정됨] addRow에 위치 인자 사용 (lb, ub, num_nz, indices, values)
+        # --- [수정 포인트 2] addRow 사용법 변경 ---
+        # h.addRow(lower_bound, upper_bound, num_nonzeros, indices, values)
         h.addRow(rhs_value, rhs_value, len(col_indices), col_indices, coeffs)
 
     # Constraint 2: Extension Constraints
     print("Adding Extension Constraints (Projection to Seed Code)...")
     
     # --- MOCK DATA FOR SEED CODE ---
-    # 실제 실험 시에는 [34, 3] 코드의 실제 분포 데이터가 필요합니다.
     num_points_pg2 = 73 
     seed_multiplicities = [0] * num_points_pg2
     for i in range(34):
@@ -147,7 +149,7 @@ def solve_proposition2():
     pg2 = ProjectiveGeometry(3, q, gf)
     pg2_points = pg2.points
     
-    # Case A: u = 0 (v1=v2=v3=0) -> P=(0,0,0,1)
+    # Case A: u = 0
     p_zero_idx = -1
     for i, p in enumerate(points):
         if p == (0,0,0,1):
@@ -155,7 +157,6 @@ def solve_proposition2():
             break
     
     if p_zero_idx != -1:
-        # x_P = 1
         h.addRow(1.0, 1.0, 1, [int(p_zero_idx)], [1.0])
     
     # Case B: u != 0
@@ -194,4 +195,11 @@ def solve_proposition2():
     print(f"Solver Status: {status}")
     
     if status == highspy.HighsModelStatus.kOptimal:
-        print("
+        print("Solution Found!")
+    elif status == highspy.HighsModelStatus.kInfeasible:
+        print("Infeasible! (Proposition 2 Proved)")
+    else:
+        print(f"Other status: {status}")
+
+if __name__ == "__main__":
+    solve_proposition2()
