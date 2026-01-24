@@ -1,0 +1,219 @@
+# ============================================================
+# Case 2: [153,7,76]_2 with 4-divisible
+# 모델:
+# - 점 P in PG(6,2) (총 127개)에 대해 정수 변수 x_P >= 0
+# - sum x_P = n = 153
+# - 모든 hyperplane H: sum_{P in H} x_P <= n - d = 77
+# - 4-divisible: 모든 hyperplane H에 대해 sum_{P in H} x_P ≡ n (mod 4)
+#   여기서는 n=153 ≡ 1 (mod 4) => sum_{P in H} x_P = 1 + 4 t_H
+#
+# 목표:
+# - feasible 해를 열거
+# - 해들을 비동형(=GL(7,2) 동치)으로 분류하여 정확히 2개임을 보이는 실험 파이프라인
+#
+# 요구사항:
+# - 주석 한국어
+# - 케이스별 파라미터 분리
+# ============================================================
+
+from itertools import product
+from collections import defaultdict
+
+def gf2_dot(u, v):
+    # u, v: int bitmasks (<= 7 bits)
+    # GF(2) 내적: parity(popcount(u & v))
+    x = u & v
+    return bin(x).count("1") & 1
+
+def pg_points_pg6_2():
+    # PG(6,2)의 점: GF(2)^7에서 0을 제외한 모든 벡터가 대표(스칼라=1뿐이라 projective 중복 없음)
+    # 점을 1..127 정수(비트마스크)로 둠
+    return list(range(1, 1 << 7))  # 1..127
+
+def hyperplanes_pg6_2(points):
+    # hyperplane H_u = {P: u·P = 0}, u != 0
+    # u도 1..127
+    hypers = []
+    for u in range(1, 1 << 7):
+        H = [p for p in points if gf2_dot(u, p) == 0]
+        # PG(6,2)에서 hyperplane은 63점이어야 함(검증용)
+        hypers.append((u, H))
+    return hypers
+
+def incidence_lists(points, hypers):
+    # 각 점 p가 포함된 hyperplane 인덱스 목록 (watched/증분 업데이트 등에 유용)
+    point_to_h = [[] for _ in range(len(points))]
+    p_index = {p:i for i,p in enumerate(points)}
+    for hi, (_u, H) in enumerate(hypers):
+        for p in H:
+            point_to_h[p_index[p]].append(hi)
+    return point_to_h
+
+# ---------------- OR-Tools CP-SAT 모델 ----------------
+def solve_case2_with_ortools(
+    n=153,
+    k=7,
+    d=76,
+    divisible=4,
+    max_solutions=50,
+    time_limit_sec=60,
+    symmetry_break=True
+):
+    """
+    OR-Tools CP-SAT로 해를 열거하는 함수.
+    - max_solutions: 몇 개 해까지 뽑을지 (동형 분류 전 원시 해 개수)
+    - time_limit_sec: 시간 제한(초)
+    """
+
+    try:
+        from ortools.sat.python import cp_model
+    except ImportError:
+        raise ImportError(
+            "OR-Tools가 설치되어 있지 않습니다. "
+            "pip install ortools 로 설치하거나, 다른 MILP 솔버 버전으로 바꿔야 합니다."
+        )
+
+    points = pg_points_pg6_2()  # 127
+    hypers = hyperplanes_pg6_2(points)  # 127
+    point_to_h = incidence_lists(points, hypers)
+
+    n_minus_d = n - d  # 77
+
+    model = cp_model.CpModel()
+
+    # x_P 변수 (0..n까지 가능하지만 bound를 좀 줄이면 도움됨)
+    x = [model.NewIntVar(0, n_minus_d, f"x_{p}") for p in points]
+    # sum x = n
+    model.Add(sum(x) == n)
+
+    # hyperplane 합 S_H, 그리고 4-divisible 선형화 변수 t_H
+    S = []
+    t = []
+
+    # t_H 상한: S_H <= 77, S_H = 1 + 4 t_H => t_H <= (77-1)/4 = 19
+    t_max = (n_minus_d - (n % divisible)) // divisible
+    if n % divisible != 0:
+        # 여기서는 n%4=1 => S_H=1+4t, t_max=19가 맞게 나오도록
+        t_max = (n_minus_d - (n % divisible)) // divisible
+
+    for hi, (_u, H) in enumerate(hypers):
+        idxs = [p-1 for p in H]  # points는 1..127, x는 같은 순서라 p-1이 index
+        Si = model.NewIntVar(0, n_minus_d, f"S_{hi}")
+        model.Add(Si == sum(x[j] for j in idxs))
+        model.Add(Si <= n_minus_d)
+
+        # 4-divisible 제약: Si = (n mod 4) + 4 t_H
+        ti = model.NewIntVar(0, t_max, f"t_{hi}")
+        model.Add(Si == (n % divisible) + divisible * ti)
+
+        S.append(Si)
+        t.append(ti)
+
+    # ---- 간단 대칭 깨기(선택) ----
+    # 완전한 GL(7,2) 대칭깨기는 무겁지만, 실전에서는 아주 약한 규칙도 도움이 됨.
+    # 예: 첫 점(비트마스크 1)의 multiplicity를 가장 크게 만드는 방향으로 정렬
+    if symmetry_break:
+        # x_1 >= x_p for p in points
+        for p in points[1:]:
+            model.Add(x[0] >= x[p-1])
+
+    # 목적함수는 feasibility이므로 없음.
+    # 다만 CP-SAT은 탐색을 위해 내부적으로 전략을 잡으니, 힌트로 분기 순서를 줌.
+    # (hyperplane에 많이 등장하는 점을 먼저, 같은 값이면 큰 값 우선 등)
+    # 여기서는 단순히 앞쪽 변수부터 결정하도록 둠.
+    model.AddDecisionStrategy(x, cp_model.CHOOSE_FIRST, cp_model.SELECT_MAX_VALUE)
+
+    solver = cp_model.CpSolver()
+    solver.parameters.max_time_in_seconds = float(time_limit_sec)
+    solver.parameters.num_search_workers = 8  # 코어 많으면 늘려도 됨
+
+    sols = []
+
+    class Collector(cp_model.CpSolverSolutionCallback):
+        def __init__(self, x_vars):
+            cp_model.CpSolverSolutionCallback.__init__(self)
+            self.x_vars = x_vars
+            self.count = 0
+
+        def on_solution_callback(self):
+            self.count += 1
+            sol = [self.Value(v) for v in self.x_vars]
+            sols.append(sol)
+            if self.count >= max_solutions:
+                self.StopSearch()
+
+    cb = Collector(x)
+    res = solver.SearchForAllSolutions(model, cb)
+
+    meta = {
+        "status": solver.StatusName(res),
+        "solutions_found": len(sols),
+        "objective": None,
+        "wall_time_sec": solver.WallTime(),
+        "points": points,
+        "hypers": hypers,
+    }
+    return meta, sols
+
+# ---------------- 해를 "비동형"으로 분류하기 위한 전처리(invariants) ----------------
+def hyperplane_sum_profile(points, hypers, x_sol):
+    # 각 hyperplane 합 S_H 목록을 정렬해서 반환
+    prof = []
+    for (_u, H) in hypers:
+        s = sum(x_sol[p-1] for p in H)
+        prof.append(s)
+    prof.sort()
+    return tuple(prof)
+
+def point_multiplicity_multiset(x_sol):
+    # 점 multiplicity 멀티셋(정렬)
+    return tuple(sorted(x_sol))
+
+def coarse_invariant(points, hypers, x_sol):
+    # 매우 강한 편의 불변량 2개:
+    # - 점 multiplicity 멀티셋
+    # - hyperplane 합 프로파일(정렬)
+    return (point_multiplicity_multiset(x_sol), hyperplane_sum_profile(points, hypers, x_sol))
+
+# ---------------- SageMath가 있다면 정확한 동형 판정(권장) ----------------
+def is_gl_equivalent_sage(x1, x2):
+    """
+    SageMath 환경에서만 동작.
+    GL(7,2) 변환으로 점 재라벨링 가능한지(=비동형 여부) 판정하려면
+    실제론 incidence 구조까지 고려한 그래프/코드 동치 판정이 필요.
+    여기서는 워크플로우 스켈레톤만 제공.
+    """
+    raise NotImplementedError(
+        "정확한 GL(7,2) 동치 판정은 SageMath/nauty 등을 붙여야 합니다. "
+        "이 함수는 '연결 지점'으로 남겨둡니다."
+    )
+
+if __name__ == "__main__":
+    # ---- 케이스2 파라미터 ----
+    n, k, d, q = 153, 7, 76, 2
+
+    meta, sols = solve_case2_with_ortools(
+        n=n, k=k, d=d, divisible=4,
+        max_solutions=200,     # 먼저 많이 뽑고
+        time_limit_sec=120,    # 시간 늘려서
+        symmetry_break=True
+    )
+    print("[Case2] CP-SAT 상태:", meta["status"])
+    print("[Case2] 찾은 해 개수:", meta["solutions_found"])
+    print("[Case2] 걸린 시간(초):", meta["wall_time_sec"])
+
+    points = meta["points"]
+    hypers = meta["hypers"]
+
+    # 1) 강한 불변량으로 1차 그룹핑 (동형 후보를 크게 줄임)
+    groups = defaultdict(list)
+    for i, sol in enumerate(sols):
+        inv = coarse_invariant(points, hypers, sol)
+        groups[inv].append(i)
+
+    print("[Case2] 불변량 기준 그룹 개수:", len(groups))
+    for gi, (inv, idxs) in enumerate(groups.items(), 1):
+        print(f"  - 그룹 {gi}: 원시 해 {len(idxs)}개 (동형 후보 묶음)")
+
+    # 2) 여기서부터는 각 그룹 안에서만 '정확한 동형 판정'을 돌리면 됨(Sage/nauty 권장)
+    print("[Case2] 다음 단계: 각 그룹 내부를 Sage/nauty로 GL(7,2) 동치 판정 -> 비동형 개수 계산")
