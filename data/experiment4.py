@@ -138,3 +138,7 @@ if __name__ == "__main__":
         pruner.run_pruning()
     except ImportError:
         print("오류: pulp 라이브러리가 필요합니다. 'pip install pulp'를 실행해주세요.")
+        pruner = ILPCodePruner()
+        pruner.run_pruning()
+    except ImportError:
+        print("오류: pulp 라이브러리가 필요합니다. 'pip install pulp'를 실행해주세요.")
