@@ -1,0 +1,53 @@
+{
+    "q": 8,
+    "k": 4,
+    "n": 35,
+    "d_min": 28,
+    "w_set": [
+        32,
+        28
+    ],
+    "delta": 4,
+    "allowed_capacities_s_h": [
+        3,
+        7
+    ],
+    "capacity_lookup": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+    ]
+}

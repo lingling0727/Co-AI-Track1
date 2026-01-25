@@ -1,0 +1,21 @@
+[솔버 사용 가이드]
+
+이 폴더에는 Sascha Kurz (2024) 논문의 모델을 기반으로 한 솔버가 포함되어 있습니다.
+
+1. 솔버 목록
+   highs_solver.py
+      - 방식: 혼합 정수 계획법 (MIP)
+      - 특징: highspy 라이브러리 사용, Method 1 & 2를 제약 조건으로 변환하여 풀이.
+      - 용도: 대규모 인스턴스(prop4 등)의 고속 탐색 및 존재성 판정.
+
+2. 실행 방법
+   솔버는 명령행 인자로 데이터셋 이름(prop1 ~ prop4)을 받습니다.
+   데이터셋은 ../datasets/ 폴더에 미리 생성되어 있어야 합니다.
+
+   (실행 예시)
+   python highs_solver.py prop4
+
+3. 필수 요구사항
+   - 데이터셋 생성: python ../datasets/generate_all_kurz_data.py 실행 필요.
+   - 라이브러리: numpy, highspy (MIP 솔버 사용 시)
+     (설치: pip install numpy highspy)
