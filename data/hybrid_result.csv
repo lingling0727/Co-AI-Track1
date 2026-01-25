@@ -1,0 +1,2 @@
+Method,Griesmer_Bound,Time(s),Nodes,LP_Calls,Note
+Hybrid (RCUB+LP),34,0.001984834671020508,36,7,Step 1 & 2 Applied
