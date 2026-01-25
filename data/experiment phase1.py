@@ -234,5 +234,7 @@ if __name__ == "__main__":
     if is_feasible:
         # 해를 3개만 찾아봄
         exp.run_phase_1(max_solutions=3)
+
+    exp.save_csv()
     
     exp.save_csv()
