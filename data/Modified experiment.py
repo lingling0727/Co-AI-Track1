@@ -188,3 +188,9 @@ if __name__ == "__main__":
         in_k = int(sys.argv[2])
         in_d = int(sys.argv[3])
         in_q = int(sys.argv[4])
+        
+        run_hybrid_experiment(in_n, in_k, in_d, in_q)
+        
+    except ValueError:
+        print("Error: All inputs (n, k, d, q) must be integers.")
+        sys.exit(1)
