@@ -1,6 +1,0 @@
-# Heuristic Algorithm Evaluation Log
-# Algorithm_Name | Hyperparameters | Runtime_Log(s) | Node_Count | Success_Rate(0.0-1.0) | Found_Code_ID
-
-# 예시:
-# SimulatedAnnealing | T=1000,alpha=0.95 | 120.5 | 50000 | 0.0 | None
-# GeneticAlgorithm | Pop=100,Gen=50 | 340.2 | 150000 | 1.0 | Code_ID_76_4_4_01

@@ -4,19 +4,6 @@ import os
 import csv
 import datetime
 
-# Baseline 모듈 경로 추가 (유연한 경로 탐색)
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 1. 하위 폴더 (./baseline) - 현재 구조
-baseline_sub = os.path.join(current_dir, 'baseline')
-if os.path.exists(baseline_sub) and baseline_sub not in sys.path:
-    sys.path.append(baseline_sub)
-
-# 2. 형제 폴더 (../baseline) - trial2 폴더 분리 시
-baseline_sibling = os.path.join(current_dir, '..', 'baseline')
-if os.path.exists(baseline_sibling) and baseline_sibling not in sys.path:
-    sys.path.append(baseline_sibling)
-
 try:
     # 같은 디렉토리에 있는 모듈들을 import 합니다.
     from geometry import generate_projective_points, generate_hyperplanes
@@ -151,7 +138,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
         solutions, nodes_visited, pruned_nodes = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
         
     except ImportError:
-         print("  > [Error] 'gurobipy' is not installed. Please run 'pip install gurobipy'.")
+         print("  > [Error] 'ortools' is not installed. Please run 'pip install ortools'.")
          return
     except Exception as e:
         print(f"  > [Error] An error occurred during ILP solving: {e}")

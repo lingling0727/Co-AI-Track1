@@ -1,0 +1,8 @@
+- abstract (연구 요약)
+1. introduction (논문 전체 간략 설명)
+2. literature review (선행 연구 설명)
+3. problem description and assumptions (우리가 풀 문제 설명)
+4. 수리 모델링 제시 (수식 설명)
+5. 알고리즘 제안 (알고리즘 설명)
+6. results (분석 및 결론)
+7. references (참고 자료)

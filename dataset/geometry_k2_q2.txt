@@ -1,0 +1,8 @@
+# Projective Geometry PG(1, 2)
+# Dimension k: 2, Field size q: 2
+# Total Points: 3
+# Format: Point_ID: (coord1, coord2, ...)
+----------------------------------------
+0: (0, 1)
+1: (1, 0)
+2: (1, 1)

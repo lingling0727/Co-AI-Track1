@@ -219,7 +219,7 @@ if __name__ == "__main__":
     print(f"[*] Generated {len(points)} points: {points}")
     
     # dataset 폴더에 저장 테스트
-    directory = "dataset"
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
     if not os.path.exists(directory):
         os.makedirs(directory)
         

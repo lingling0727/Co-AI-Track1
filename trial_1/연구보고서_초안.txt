@@ -1,8 +1,0 @@
-- abstract
-1. introduction
-2. literature review
-3. problem description and assumptions
-4. 수리 모델링 제시
-5. 알고리즘 제안
-6. results
-7. references

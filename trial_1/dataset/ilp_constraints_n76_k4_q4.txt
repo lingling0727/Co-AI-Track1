@@ -1,6 +1,0 @@
-# ILP Constraints for Code [n=76, k=4, q=4]
-# Target Weights: 56, 64
-# Format: A * x = b (Rows: Constraints, Cols: Point IDs)
-# Constraint_ID	Coefficients(PointID:Val,...)	RHS_Value
-0	0:1, 1:1, 2:1, ...	76  # Total Length Constraint
-1	0:1, 5:1, 10:1, ...	   # Min Weight Constraint

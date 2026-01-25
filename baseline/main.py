@@ -4,19 +4,6 @@ import os
 import csv
 import datetime
 
-# Baseline 모듈 경로 추가 (유연한 경로 탐색)
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 1. 하위 폴더 (./baseline) - 현재 구조
-baseline_sub = os.path.join(current_dir, 'baseline')
-if os.path.exists(baseline_sub) and baseline_sub not in sys.path:
-    sys.path.append(baseline_sub)
-
-# 2. 형제 폴더 (../baseline) - trial2 폴더 분리 시
-baseline_sibling = os.path.join(current_dir, '..', 'baseline')
-if os.path.exists(baseline_sibling) and baseline_sibling not in sys.path:
-    sys.path.append(baseline_sibling)
-
 try:
     # 같은 디렉토리에 있는 모듈들을 import 합니다.
     from geometry import generate_projective_points, generate_hyperplanes
@@ -31,7 +18,7 @@ def save_geometry_data(k, q, points):
     """
     생성된 기하학적 데이터를 텍스트 파일로 저장합니다.
     """
-    directory = "dataset"
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
     if not os.path.exists(directory):
         os.makedirs(directory)
     
@@ -50,57 +37,29 @@ def save_geometry_data(k, q, points):
     except Exception as e:
         print(f"  > [Error] Failed to save geometry data: {e}")
 
-def save_experiment_results(n, k, q, weights, num_points, ilp_time, phase2_time, total_sols, unique_sols, nodes_visited, pruned_nodes):
+def save_experiment_results(n, k, q, weights, num_points, phase0_time, phase1_time, phase2_time, total_sols, unique_sols, nodes_visited=0, pruned_nodes=0):
     """
     실험 결과를 CSV 파일로 저장합니다.
     """
-    filename = "experiment_results.csv"
-    
-    # 정의된 헤더
-    headers = [
-        "Timestamp", "Length(n)", "Dimension(k)", "Field(q)", "Target_Weights", "Num_Points",
-        "Existence_Status", "Search_Time(s)", "Verify_Time(s)", 
-        "Total_Solutions", "Unique_Solutions", "Nodes_Visited", "Pruned_Nodes"
-    ]
-
-    # 파일 상태 및 헤더 일치 여부 확인
+    filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment_results.csv")
     file_exists = os.path.isfile(filename)
-    should_write_header = False
-    
-    if file_exists:
-        try:
-            with open(filename, 'r', newline='', encoding='utf-8') as f:
-                reader = csv.reader(f)
-                try:
-                    existing_headers = next(reader)
-                    if existing_headers != headers:
-                        should_write_header = True
-                        file_exists = False # 헤더가 다르면 덮어쓰기 모드로 전환
-                except StopIteration:
-                    should_write_header = True # 파일이 비어있음
-        except Exception:
-            should_write_header = True
-            file_exists = False
-    else:
-        should_write_header = True
-
-    mode = 'a' if file_exists else 'w'
     
     try:
-        with open(filename, mode=mode, newline='', encoding='utf-8') as f:
+        with open(filename, mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
+            # 파일이 처음 생성될 때만 헤더 작성
+            if not file_exists:
+                writer.writerow([
+                    "Timestamp", "n", "k", "q", "Weights", "Points",
+                    "Phase0_Time", "Phase1_Time", "Phase2_Time", "Existence_Status",
+                    "Total_Solutions", "Unique_Solutions", "Nodes_Visited", "Pruned_Nodes"
+                ])
             
-            if should_write_header:
-                writer.writerow(headers)
-            
-            # 해 존재 여부 (Exhaustive Search이므로 0이면 존재하지 않음 증명)
             status = "Feasible" if total_sols > 0 else "Infeasible"
-
             writer.writerow([
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 n, k, q, str(list(weights)), num_points,
-                status, f"{ilp_time:.4f}", f"{phase2_time:.4f}", total_sols, unique_sols,
-                nodes_visited, pruned_nodes
+                f"{phase0_time:.4f}", f"{phase1_time:.4f}", f"{phase2_time:.4f}", status, total_sols, unique_sols, nodes_visited, pruned_nodes
             ])
         print(f"  > [Logged] Experiment results saved to '{filename}'")
     except Exception as e:
@@ -110,7 +69,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
     """
     주어진 파라미터로 선형 부호 분류를 수행하는 메인 함수
     """
-    try:
+    try:        
         target_weights = set(map(int, weights_str.split(',')))
     except ValueError:
         print(f"Error: Invalid format for weights '{weights_str}'. Should be comma-separated numbers.")
@@ -124,13 +83,25 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
 
     # --- 단계 1: 기하학적 구조 생성 ---
     print("\n[1] Generating Projective Geometry...")
+    
+    # [Safety Check] 예상되는 점의 개수를 미리 계산하여 시스템 멈춤 방지
+    try:
+        expected_points = (q**k - 1) // (q - 1)
+        print(f"  > Estimated points in PG({k-1}, {q}): {expected_points:,}")
+        if expected_points > 30_000: # 3만 개 초과 시 강제 중단 (PC 메모리 보호)
+            print(f"  > [Error] Geometry is too large (> 30,000 points). Execution aborted to prevent MemoryError.")
+            print(f"  > Recommendation: Decrease k or q. (e.g., for q=9, max k is 5)")
+            return
+    except OverflowError:
+        print("  > [Error] Parameters are too large to calculate geometry size.")
+        return
+
     start_geom = time.time()
     try:
         points = generate_projective_points(k, q)
         # PG(k-1, q)에서 점과 초평면은 동형이므로 동일한 생성 함수 사용
         hyperplanes = points 
         num_points = len(points)
-        expected_points = (q**k - 1) // (q - 1)
         if num_points != expected_points:
             print(f"  > Warning: Generated {num_points} points, but expected {expected_points}.")
     except Exception as e:
@@ -162,7 +133,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
 
     if not solutions:
         print("\n[*] No solutions found. The code with the given parameters likely does not exist.")
-        save_experiment_results(n, k, q, target_weights, num_points, ilp_time, 0.0, 0, 0, nodes_visited, pruned_nodes)
+        save_experiment_results(n, k, q, target_weights, num_points, 0.0, ilp_time, 0.0, 0, 0, nodes_visited, pruned_nodes)
         return
 
     # --- 단계 3: 해 검증 및 동형성 필터링 (Phase 2) ---
@@ -192,7 +163,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
     print("\nClassification finished.")
     
     # 결과 파일 저장
-    save_experiment_results(n, k, q, target_weights, num_points, ilp_time, phase2_time, len(solutions), len(unique_solutions), nodes_visited, pruned_nodes)
+    save_experiment_results(n, k, q, target_weights, num_points, 0.0, ilp_time, phase2_time, len(solutions), len(unique_solutions), nodes_visited, pruned_nodes)
     
     return unique_solutions, points # 다음 확장을 위해 반환
 
