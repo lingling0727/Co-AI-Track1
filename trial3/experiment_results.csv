@@ -1,2 +1,4 @@
 Timestamp,n,k,q,Weights,Points,Phase0_Time,Phase0.5_Time,Phase1.5_Prep_Time,Phase1_Search_Time,Phase2_Time,Status,Total_Sols,Unique_Sols,Nodes,Pruned
 2026-01-27 05:49:04,15,4,2,[8],15,0.0083,0.0000,0.0010,1.4051,0.0010,Feasible,1,1,529400,309409
+2026-01-27 06:01:10,15,4,2,[8],15,0.0041,0.0020,0.0020,1.520ㅐ,0.0015,Feasible,2,1,529400,309409
+2026-01-27 06:05:39,15,4,2,[8],15,0.0062,0.0000,0.0015,0.0321,0.0010,Feasible,1,1,0,0

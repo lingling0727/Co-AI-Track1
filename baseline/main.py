@@ -139,11 +139,10 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
 
     # --- 단계 2: ILP 모델 생성 및 해 열거 (Phase 0 & 1) ---
     print("\n[2] Building ILP model and starting enumeration (Phase 0 & 1)...")
-    start_ilp = time.time()
     try:
         extender = CodeExtender(n=n, k=k, q=q, target_weights=target_weights)
-        # 확장 모드일 경우 base_code 정보 전달
-        solutions, nodes_visited, pruned_nodes = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
+        # Phase 0 (Feasibility)와 Phase 1 (Search) 시간을 분리하여 측정
+        solutions, nodes_visited, pruned_nodes, phase0_time, phase1_time = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
         
     except ImportError:
          print("  > [Error] 'gurobipy' is not installed. Please run 'pip install gurobipy'.")
@@ -151,13 +150,13 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
     except Exception as e:
         print(f"  > [Error] An error occurred during ILP solving: {e}")
         return
-    end_ilp = time.time()
-    ilp_time = end_ilp - start_ilp
-    print(f"  > Phase 1 finished in {ilp_time:.4f}s. Found {len(solutions)} candidate solution(s).")
+
+    print(f"  > Phase 0 finished in {phase0_time:.4f}s.")
+    print(f"  > Phase 1 finished in {phase1_time:.4f}s. Found {len(solutions)} candidate solution(s).")
 
     if not solutions:
         print("\n[*] No solutions found. The code with the given parameters likely does not exist.")
-        save_experiment_results(n, k, q, target_weights, num_points, 0.0, ilp_time, 0.0, 0, 0, nodes_visited, pruned_nodes)
+        save_experiment_results(n, k, q, target_weights, num_points, phase0_time, phase1_time, 0.0, 0, 0, nodes_visited, pruned_nodes)
         return
 
     # --- 단계 3: 해 검증 및 동형성 필터링 (Phase 2) ---
@@ -187,7 +186,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
     print("\nClassification finished.")
     
     # 결과 파일 저장
-    save_experiment_results(n, k, q, target_weights, num_points, 0.0, ilp_time, phase2_time, len(solutions), len(unique_solutions), nodes_visited, pruned_nodes)
+    save_experiment_results(n, k, q, target_weights, num_points, phase0_time, phase1_time, phase2_time, len(solutions), len(unique_solutions), nodes_visited, pruned_nodes)
     
     return unique_solutions, points # 다음 확장을 위해 반환
 

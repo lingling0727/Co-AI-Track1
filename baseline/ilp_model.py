@@ -1,6 +1,12 @@
-import gurobipy as gp
-from gurobipy import GRB
-from geometry import get_incidence_matrix, get_projection_map, is_point_in_hyperplane
+import time
+try:
+    import gurobipy as gp
+    from gurobipy import GRB
+    GUROBI_AVAILABLE = True
+except ImportError:
+    GUROBI_AVAILABLE = False
+
+from geometry import get_incidence_matrix
 
 class CodeExtender:
     def __init__(self, n, k, q, target_weights):
@@ -8,98 +14,106 @@ class CodeExtender:
         self.k = k
         self.q = q
         self.target_weights = sorted(list(target_weights))
+        self.allowed_intersections = {n - w for w in self.target_weights}
+        
+        if not self.allowed_intersections:
+            self.min_allowed_k = 0
+            self.max_allowed_k = n
+        else:
+            self.min_allowed_k = min(self.allowed_intersections)
+            self.max_allowed_k = max(self.allowed_intersections)
+
+        self.solutions = []
+        self.nodes_visited = 0
+        self.pruned_nodes = 0
 
     def build_and_solve(self, points, hyperplanes, base_code_counts=None, points_km1=None):
-        """
-        Builds and solves the ILP model using Gurobi.
-        Returns a list of solutions (dicts of point counts).
-        """
-        # Create Model
-        model = gp.Model("CodeClassification")
-        model.setParam('OutputFlag', 0)  # Silent mode
-        
-        # Variables: x[i] is the multiplicity of point i
-        x = {}
-        for i in range(len(points)):
-            x[i] = model.addVar(vtype=GRB.INTEGER, lb=0, name=f"x_{i}")
-        
-        # [Paper Match] Lemma 1, Eq (5): Systematic Generator Matrix Assumption
-        # 기저 벡터(단위 벡터)는 반드시 코드에 포함되어야 한다고 가정 (x >= 1)
-        if base_code_counts is None:
-            for i, p in enumerate(points):
-                if p.count(1) == 1 and p.count(0) == self.k - 1:
-                    x[i].LB = 1
+        if not GUROBI_AVAILABLE:
+            print("  > [Error] 'gurobipy' is not installed.")
+            return [], 0, 0, 0.0, 0.0
 
-        # Constraint 1: Total Length n
-        model.addConstr(gp.quicksum(x[i] for i in range(len(points))) == self.n, "Length")
-        
-        # Constraint 2: Weights
-        # For each hyperplane H, sum(x_P for P in H) must be k_H
-        # where n - k_H in target_weights.
-        # So k_H in {n - w for w in target_weights}
-        
-        allowed_k = [self.n - w for w in self.target_weights]
-        
-        # Precompute incidence matrix for efficiency
-        # (Assuming hyperplanes and points are aligned with indices)
-        incidence = get_incidence_matrix(points, hyperplanes, self.q)
-        
-        for h_idx in range(len(hyperplanes)):
-            # Calculate the sum of points in this hyperplane
-            # Using incidence matrix: sum(x[i] * incidence[h][i])
-            # Note: incidence[h][i] is 1 if point i is in hyperplane h
-            
-            expr = gp.quicksum(x[i] for i in range(len(points)) if incidence[h_idx][i] == 1)
-            
-            # The sum must be one of the allowed values
-            # We use binary variables z to enforce this disjunction
-            z = model.addVars(allowed_k, vtype=GRB.BINARY, name=f"z_{h_idx}")
-            
-            # Select exactly one allowed k
-            model.addConstr(gp.quicksum(z[k_val] for k_val in allowed_k) == 1)
-            
-            # Link expr to the selected k
-            model.addConstr(expr == gp.quicksum(k_val * z[k_val] for k_val in allowed_k))
+        incidence_matrix = get_incidence_matrix(points, hyperplanes, self.q)
 
-        # Constraint 3: Extension (if applicable)
-        if base_code_counts is not None and points_km1 is not None:
-            mapping, ext_idx = get_projection_map(self.k, self.q, points, points_km1)
-            
-            # For each point P' in PG(k-2, q), the sum of multiplicities of points 
-            # projecting to P' must equal the multiplicity of P' in the base code.
-            for p_km1_idx, p_k_indices in mapping.items():
-                target_count = base_code_counts.get(p_km1_idx, 0)
-                model.addConstr(gp.quicksum(x[i] for i in p_k_indices) == target_count, 
-                                name=f"Ext_{p_km1_idx}")
-            
-            # Note: The extension point (ext_idx) multiplicity is implicitly handled 
-            # by the total length constraint and the sum of base code counts.
+        # --- Phase 0: Feasibility Check ---
+        start_p0 = time.time()
+        print("    > [Phase 0] Running Gurobi feasibility check...")
+        if not self._check_phase0_gurobi(points, incidence_matrix):
+            print("    > [Phase 0] Infeasible. Stopping.")
+            phase0_time = time.time() - start_p0
+            return [], 0, 0, phase0_time, 0.0
+        phase0_time = time.time() - start_p0
 
-        # Solve Configuration
-        # We want to find ALL feasible solutions (Classification)
-        model.setParam(GRB.Param.PoolSearchMode, 2)  # 2 = Find all best solutions
-        model.setParam(GRB.Param.PoolSolutions, 2000000)  # Large buffer
-        model.setParam(GRB.Param.PoolGap, 0)  # Only optimal (feasible) solutions
+        # --- Phase 1: Full Enumeration ---
+        start_p1 = time.time()
+        print("    > [Phase 1] Starting Gurobi search...")
+        solutions, nodes = self._solve_gurobi(points, incidence_matrix, base_code_counts, points_km1)
+        phase1_time = time.time() - start_p1
         
-        model.optimize()
+        self.solutions = solutions
+        self.nodes_visited = nodes
         
-        solutions = []
-        if model.Status == GRB.OPTIMAL:
-            n_solutions = model.SolCount
-            for i in range(n_solutions):
-                model.setParam(GRB.Param.SolutionNumber, i)
-                sol = {}
-                for j in range(len(points)):
-                    val = x[j].Xn
-                    if val > 0.5:
-                        sol[j] = int(round(val))
-                solutions.append(sol)
+        return self.solutions, self.nodes_visited, 0, phase0_time, phase1_time
+
+    def _check_phase0_gurobi(self, points, incidence_matrix):
+        try:
+            model = gp.Model("Phase0_Baseline")
+            model.setParam('OutputFlag', 0)
+            x = model.addVars(len(points), vtype=GRB.INTEGER, lb=0, ub=self.n)
+            model.addConstr(x.sum() == self.n)
             
-            # [Info] NodeCount가 0인 경우 사용자에게 이유를 알림
-            if model.NodeCount == 0:
-                print("    > [Gurobi] Solved during presolve or at root node (NodeCount=0).")
-        
-        # Return format: solutions, nodes_visited, pruned_nodes
-        # Gurobi doesn't give "pruned_nodes" in the same sense as backtracking, 
-        # so we return NodeCount for visited and 0 for pruned.
-        return solutions, int(model.NodeCount), 0
+            for h_idx, row in enumerate(incidence_matrix):
+                expr = gp.LinExpr()
+                for p_idx, val in enumerate(row):
+                    if val == 1: expr.add(x[p_idx])
+                model.addConstr(expr >= self.min_allowed_k)
+                model.addConstr(expr <= self.max_allowed_k)
+            
+            model.optimize()
+            return model.Status != GRB.INFEASIBLE
+        except Exception as e:
+            print(f"      > Gurobi Error in Phase 0: {e}")
+            return True
+
+    def _solve_gurobi(self, points, incidence_matrix, base_code_counts=None, points_km1=None):
+        try:
+            model = gp.Model("CodeClassification_Baseline")
+            model.setParam('OutputFlag', 0)
+            model.setParam(GRB.Param.PoolSearchMode, 2)
+            model.setParam(GRB.Param.PoolGap, 0.0)
+            model.setParam(GRB.Param.PoolSolutions, 2000000)
+            
+            x = model.addVars(len(points), vtype=GRB.INTEGER, lb=0, ub=self.n, name="x")
+            model.addConstr(x.sum() == self.n, "Length")
+            
+            allowed_k = sorted(list(self.allowed_intersections))
+            if not allowed_k: return [], 0
+
+            for h_idx in range(len(incidence_matrix)):
+                expr = gp.quicksum(x[p_idx] for p_idx, val in enumerate(incidence_matrix[h_idx]) if val == 1)
+                
+                z = model.addVars(allowed_k, vtype=GRB.BINARY, name=f"z_{h_idx}")
+                model.addConstr(z.sum() == 1)
+                model.addConstr(expr == gp.quicksum(k * z[k] for k in allowed_k))
+
+            if base_code_counts and points_km1:
+                from geometry import get_projection_map
+                mapping, _ = get_projection_map(self.k, self.q, points, points_km1)
+                for p_km1_idx, p_k_indices in mapping.items():
+                    target = base_code_counts.get(p_km1_idx, 0)
+                    model.addConstr(gp.quicksum(x[i] for i in p_k_indices) == target)
+
+            model.optimize()
+            
+            solutions = []
+            if model.Status in [GRB.OPTIMAL, GRB.SOLUTION_LIMIT]:
+                n_solutions = model.SolCount
+                for i in range(n_solutions):
+                    model.setParam(GRB.Param.SolutionNumber, i)
+                    sol = {j: int(round(x[j].Xn)) for j in range(len(points)) if x[j].Xn > 0.5}
+                    solutions.append(sol)
+            
+            return solutions, int(model.NodeCount)
+            
+        except Exception as e:
+            print(f"      > Gurobi Error in Baseline Solve: {e}")
+            return [], 0
