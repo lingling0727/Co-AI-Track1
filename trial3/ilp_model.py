@@ -27,34 +27,41 @@ class CodeExtender:
         self.solutions = []
         self.nodes_visited = 0
         self.pruned_nodes = 0
-
+        
     def build_and_solve(self, points, hyperplanes, base_code_counts=None, points_km1=None):
         self.solutions = []
         self.nodes_visited = 0
         self.pruned_nodes = 0
         
-        start_time = time.time()
+        phase0_time = 0.0
+        phase0_5_time = 0.0
+        phase1_5_prep_time = 0.0
+        search_time = 0.0
         
-        # --- Phase 0.5: Theoretical Bounds Check ---
-        print("    > [Phase 0.5] Checking theoretical bounds...")
-        if not self._phase_0_5_checks():
-            print("    > [Phase 0.5] Failed. Stopping.")
-            return [], 0, 0, 0, time.time() - start_time, 0.0
-
-        # --- Phase 0: ILP Feasibility Check ---
+        # --- Phase 0: ILP Feasibility Check (Baseline) ---
         incidence_matrix = get_incidence_matrix(points, hyperplanes, self.q)
         if GUROBI_AVAILABLE:
+            start_time = time.time()
             print("    > [Phase 0] Running Gurobi feasibility check...")
             if not self._check_phase0_gurobi(points, incidence_matrix):
                 print("    > [Phase 0] Infeasible. Stopping.")
-                return [], 0, 0, 0, time.time() - start_time, 0.0
+                phase0_time = time.time() - start_time
+                return [], 0, 0, phase0_time, phase0_5_time, phase1_5_prep_time, search_time
+            phase0_time = time.time() - start_time
         
-        precomp_time = time.time() - start_time
+        # --- Phase 0.5: Theoretical Bounds Check ---
+        start_time = time.time()
+        print("    > [Phase 0.5] Checking theoretical bounds...")
+        if not self._phase_0_5_checks():
+            print("    > [Phase 0.5] Failed. Stopping.")
+            phase0_5_time = time.time() - start_time
+            return [], 0, 0, phase0_time, phase0_5_time, phase1_5_prep_time, search_time
+        phase0_5_time = time.time() - start_time
         
         # --- Phase 1.5 Preparation: Symmetry Breaking ---
-        # Generate orbits to restrict the first choice of points
         initial_candidates = None
         if not base_code_counts:
+            start_time = time.time()
             print("    > [Phase 1.5] Generating orbits for symmetry breaking...")
             try:
                 matrices = generate_linear_group(self.k, self.q, limit=2000)
@@ -64,12 +71,12 @@ class CodeExtender:
                 print(f"    > [Phase 1.5] Reduced initial branches: {len(points)} -> {len(initial_candidates)}")
             except Exception as e:
                 print(f"    > [Phase 1.5] Symmetry breaking skipped: {e}")
+            phase1_5_prep_time = time.time() - start_time
 
         # --- Phase 1: Backtracking ---
         print("    > [Phase 1] Starting recursive search...")
         search_start = time.time()
         
-        # Precompute sparse incidence
         point_to_hyperplanes = [[] for _ in range(len(points))]
         for h_idx, row in enumerate(incidence_matrix):
             for p_idx, val in enumerate(row):
@@ -79,7 +86,7 @@ class CodeExtender:
         self._backtrack(0, 0, {}, current_hyperplane_counts, point_to_hyperplanes, len(points), initial_candidates)
         
         search_time = time.time() - search_start
-        return self.solutions, self.nodes_visited, self.pruned_nodes, 0, precomp_time, search_time
+        return self.solutions, self.nodes_visited, self.pruned_nodes, phase0_time, phase0_5_time, phase1_5_prep_time, search_time
 
     def _phase_0_5_checks(self):
         """
