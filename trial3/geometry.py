@@ -7,6 +7,7 @@ class GaloisField:
         self.q = q
         self.is_prime = self._is_prime(q)
         self.mul_table = {}
+        self.add_table = {}
         self.inv_table = {}
         if not self.is_prime:
             self._init_tables()
@@ -35,14 +36,37 @@ class GaloisField:
                     else: self.mul_table[(a,b)] = exp[log[a] + log[b]]
             self.inv_table = {a: exp[(7 - log[a]) % 7] for a in range(1, 8)}
         else:
-            pass 
+            if self.q == 9:
+                # GF(9) ~= F3[x] / (x^2 + 1), elements are 3*h + l
+                for a in range(9):
+                    for b in range(9):
+                        h1, l1 = divmod(a, 3)
+                        h2, l2 = divmod(b, 3)
+                        
+                        # Addition
+                        self.add_table[(a,b)] = 3*((h1 + h2) % 3) + ((l1 + l2) % 3)
+                        
+                        # Multiplication: (h1*x+l1)*(h2*x+l2) with x^2 = -1 = 2
+                        h_prod = (h1*l2 + l1*h2) % 3
+                        l_prod = (l1*l2 + 2*h1*h2) % 3
+                        self.mul_table[(a,b)] = 3*h_prod + l_prod
+                
+                for a in range(1, 9):
+                    for b in range(1, 9):
+                        if self.mul_table.get((a,b)) == 1:
+                            self.inv_table[a] = b
+                            break
+            else:
+                raise NotImplementedError(f"GF({self.q}) is not supported yet.")
 
     def add(self, a, b):
         if self.is_prime: return (a + b) % self.q
+        if self.q == 9: return self.add_table.get((a,b))
         return a ^ b
 
     def sub(self, a, b):
         if self.is_prime: return (a - b) % self.q
+        if self.q == 9: return self.add(a, self.mul(b, 2)) # a - b = a + 2b in char 3
         return a ^ b
 
     def mul(self, a, b):

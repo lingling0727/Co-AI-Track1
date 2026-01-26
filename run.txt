@@ -1,7 +1,7 @@
 지금까지 추가된 모든 최적화 기법들을 요약하고, 각각 어떤 종류의 문제에서 가장 효과적인지 설명해 줘
 
-python baseline/main.py 15 4 2 "8"
-python trial3/main.py 15 4 2 "8"
+python baseline/main.py 10 2 9 "9"
+python trial3/main.py 10 2 9 "9"
 python compare_results.py
 python trial2/compare_performance.py 15 4 2 "8"
 
