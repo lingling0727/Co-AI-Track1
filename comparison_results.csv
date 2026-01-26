@@ -1,4 +1,0 @@
-Method,Length(n),Dimension(k),Field(q),Target_Weights,Total_Time(s),Precomp_Time(s),Search_Time(s),Nodes_Visited,Pruned_Nodes,Total_Solutions,Note
-Pure Backtracking,7,3,2,"[3, 4]",0.0021,0.0000,0.0021,1086,0,1,No Pruning
-Baseline (Paper),7,3,2,"[3, 4]",0.0326,0.0000,0.0326,24,13,1,LP Calls: 11
-Proposed (All Optimizations),7,3,2,"[3, 4]",0.0219,0.0189,0.0010,236,136,1,All optimizations incl. LP Pruning (Calls: 0)
