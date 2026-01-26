@@ -1,2 +1,5 @@
 Timestamp,n,k,q,Weights,Points,Phase0_Time,Phase1_Time,Phase2_Time,Existence_Status,Total_Solutions,Unique_Solutions,Nodes_Visited,Pruned_Nodes
 2026-01-25 04:37:01,7,3,2,"[3, 4]",7,0.0000,0.0123,0.0000,Feasible,1,1,5,0
+2026-01-27 01:21:38,3,2,2,[2],3,0.0000,0.0074,0.0001,Feasible,1,1,0,0
+2026-01-27 01:21:38,7,3,2,"[3, 4]",7,0.0000,0.0021,0.0000,Infeasible,0,0,0,0
+2026-01-27 01:22:09,4,2,3,[3],4,0.0000,0.0020,0.0001,Feasible,1,1,0,0
