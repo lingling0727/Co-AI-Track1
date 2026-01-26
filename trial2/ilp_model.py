@@ -38,6 +38,8 @@ class CodeExtender:
         self.pruned_nodes = 0
         self.lp_pruning_calls = 0
         
+        self.early_exit = False
+
         # Persistent Gurobi Model Storage
         self.lp_model = None
         self.lp_vars = []
@@ -45,7 +47,7 @@ class CodeExtender:
         self.lp_constrs_max = []
         self.lp_constr_total = None
 
-    def build_and_solve(self, points, hyperplanes, base_code_counts=None, points_km1=None):
+    def build_and_solve(self, points, hyperplanes, base_code_counts=None, points_km1=None, early_exit=False):
         """
         Main entry point for the solver.
         """
@@ -53,36 +55,44 @@ class CodeExtender:
         self.nodes_visited = 0
         self.pruned_nodes = 0
         self.lp_pruning_calls = 0
+        self.early_exit = early_exit
         num_points = len(points)
         num_hyperplanes = len(hyperplanes)
 
         print(f"    > Initializing Custom Solver (n={self.n}, k={self.k}, q={self.q})")
         print(f"    > Allowed Intersection Sizes on Hyperplanes: {sorted(list(self.allowed_intersections))}")
 
+        precomp_start_time = time.time()
+
         # 0. Theoretical Bounds Check (Pre-computation)
         if not self._check_theoretical_bounds():
             print("    > [Pre-check] Theoretical bounds check failed. Stopping.")
-            return [], 0, 0
+            precomp_time = time.time() - precomp_start_time
+            return [], 0, 0, 0, precomp_time, 0.0
 
         # 0.5. Phase 0.5: Recursive Residual Check
         if not self._phase_0_5_recursive_checks():
              print("    > [Phase 0.5] Recursive checks failed. Stopping.")
-             return [], 0, 0
+             precomp_time = time.time() - precomp_start_time
+             return [], 0, 0, 0, precomp_time, 0.0
              
         # 0.6. Phase 0.5: Pless Power Moments Check (MacWilliams Identities)
         if not self._check_pless_moments():
             print("    > [Phase 0.5] Pless Power Moments check failed. Stopping.")
-            return [], 0, 0
+            precomp_time = time.time() - precomp_start_time
+            return [], 0, 0, 0, precomp_time, 0.0
 
         # 0.7. Phase 0.5: Hamming Bound Check
         if not self._check_hamming_bound():
             print("    > [Phase 0.5] Hamming (Sphere-Packing) Bound check failed. Stopping.")
-            return [], 0, 0, 0
+            precomp_time = time.time() - precomp_start_time
+            return [], 0, 0, 0, precomp_time, 0.0
 
         # 0.8. Phase 0.5: Dual Projective Bound Check
         if not self._check_dual_projective_bound():
             print("    > [Phase 0.5] Dual Projective Bound check failed. Stopping.")
-            return [], 0, 0, 0
+            precomp_time = time.time() - precomp_start_time
+            return [], 0, 0, 0, precomp_time, 0.0
 
         # 1. Build Sparse Incidence Map (Method 1 Preparation)
         # geometry.py의 get_incidence_matrix는 dense matrix를 반환하므로 sparse 형태로 변환
@@ -101,7 +111,8 @@ class CodeExtender:
             print("    > [Phase 0] Running Gurobi feasibility check...")
             if not self._check_phase0_gurobi(points, incidence_matrix):
                 print("    > [Phase 0] Problem is INFEASIBLE. Stopping.")
-                return [], 0, 0
+                precomp_time = time.time() - precomp_start_time
+                return [], 0, 0, 0, precomp_time, 0.0
             print("    > [Phase 0] Passed. Starting enumeration.")
             
             # [Optimization] Initialize Persistent LP Model for Pruning
@@ -142,8 +153,12 @@ class CodeExtender:
                 print(f"    > [Symmetry] Failed to apply symmetry breaking: {e}")
                 initial_candidates = None
 
+        precomp_time = time.time() - precomp_start_time
+
         # 4. Start Recursive Search
+        search_start_time = time.time()
         self._backtrack(start_idx, current_n, current_counts, current_hyperplane_counts, point_to_hyperplanes, num_points, incidence_matrix, candidates=initial_candidates)
+        search_time = time.time() - search_start_time
         
         print(f"    > Search finished. Visited {self.nodes_visited} nodes, Pruned {self.pruned_nodes} branches, LP Pruning Calls: {self.lp_pruning_calls}.")
         
@@ -152,7 +167,7 @@ class CodeExtender:
             self.lp_model.dispose()
             self.lp_model = None
             
-        return self.solutions, self.nodes_visited, self.pruned_nodes, self.lp_pruning_calls
+        return self.solutions, self.nodes_visited, self.pruned_nodes, self.lp_pruning_calls, precomp_time, search_time
 
     def _check_theoretical_bounds(self):
         """
@@ -440,7 +455,7 @@ class CodeExtender:
 
         # [NEW] Method 4: LP-based Pruning (Paper's approach)
         # Call it conditionally to manage overhead. e.g., every few levels
-        if current_n > 0 and current_n % 2 == 0 and remaining > 2:
+        if current_n > 0 and remaining > 2:
              if not self._lp_prune(remaining, current_hyperplane_counts, start_idx, num_points, incidence_matrix):
                  self.pruned_nodes += 1
                  return
@@ -466,6 +481,10 @@ class CodeExtender:
             # 다음 깊이부터는 candidates 없이 순차 탐색 (중복 조합이므로 start_idx는 현재 p_idx)
             self._backtrack(p_idx, current_n + 1, current_counts, current_hyperplane_counts, point_to_hyperplanes, num_points, incidence_matrix, candidates=None)
             
+            # Early exit for fair comparison
+            if self.early_exit and self.solutions:
+                return
+
             # Backtrack (Undo changes)
             current_counts[p_idx] -= 1
             if current_counts[p_idx] == 0:

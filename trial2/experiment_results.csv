@@ -1,13 +1,2 @@
-Timestamp,Length(n),Dimension(k),Field(q),Target_Weights,Num_Points,Existence_Status,Search_Time(s),Verify_Time(s),Total_Solutions,Unique_Solutions,Nodes_Visited,Pruned_Nodes
-2026-01-24 22:20:38,3,2,2,[2],3,Feasible,0.0055,0.0000,1,1,14,3
-2026-01-24 22:20:38,7,3,2,"[3, 4]",7,Feasible,0.0076,0.0031,1,1,1036,509
-2026-01-26 14:04:38,8,2,7,[7],8,Feasible,0.1001,0.0088,1,1,256,120
-2026-01-26 14:10:16,8,2,7,[7],8,Feasible,0.1520,0.0242,1,1,256,120
-2026-01-26 20:44:27,8,2,7,[7],8,Feasible,0.0804,0.0201,1,1,256,120
-2026-01-26 20:47:20,10,3,2,"[8, 3]",7,Infeasible,0.2030,0.0000,0,0,8998,792
-2026-01-26 20:47:26,8,2,7,[7],8,Feasible,0.1398,0.0115,1,1,256,120
-2026-01-26 20:51:51,10,3,2,"[3, 8]",7,Infeasible,0.0417,0.0000,0,0,8998,792
-2026-01-26 20:56:32,7,3,2,"[3, 4]",7,Feasible,0.0176,0.0074,1,1,496,247
-2026-01-27 04:40:07,8,2,7,[7],8,Feasible,0.1289,0.0080,1,1,68,39
-2026-01-27 04:41:22,8,2,7,[7],8,Feasible,0.1213,0.0075,1,1,68,39
-2026-01-27 05:06:29,8,2,7,[7],8,Feasible,0.0825,0.0079,1,1,256,120
+Timestamp,Length(n),Dimension(k),Field(q),Target_Weights,Num_Points,Existence_Status,Precomp_Time(s),Search_Time(s),Verify_Time(s),Total_Solutions,Unique_Solutions,Nodes_Visited,Pruned_Nodes
+2026-01-27 05:27:12,13,3,3,[9],13,Feasible,0.0103,0.3157,0.0006,1,1,133754,72330

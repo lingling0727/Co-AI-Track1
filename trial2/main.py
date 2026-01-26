@@ -45,7 +45,7 @@ def save_geometry_data(k, q, points):
     except Exception as e:
         print(f"  > [Error] Failed to save geometry data: {e}")
 
-def save_experiment_results(n, k, q, weights, num_points, ilp_time, phase2_time, total_sols, unique_sols, nodes_visited, pruned_nodes):
+def save_experiment_results(n, k, q, weights, num_points, precomp_time, search_time, phase2_time, total_sols, unique_sols, nodes_visited, pruned_nodes):
     """
     실험 결과를 CSV 파일로 저장합니다.
     """
@@ -55,7 +55,7 @@ def save_experiment_results(n, k, q, weights, num_points, ilp_time, phase2_time,
     # 정의된 헤더
     headers = [
         "Timestamp", "Length(n)", "Dimension(k)", "Field(q)", "Target_Weights", "Num_Points",
-        "Existence_Status", "Search_Time(s)", "Verify_Time(s)", 
+        "Existence_Status", "Precomp_Time(s)", "Search_Time(s)", "Verify_Time(s)", 
         "Total_Solutions", "Unique_Solutions", "Nodes_Visited", "Pruned_Nodes"
     ]
 
@@ -95,7 +95,7 @@ def save_experiment_results(n, k, q, weights, num_points, ilp_time, phase2_time,
             writer.writerow([
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 n, k, q, str(sorted(list(weights))), num_points,
-                status, f"{ilp_time:.4f}", f"{phase2_time:.4f}", total_sols, unique_sols,
+                status, f"{precomp_time:.4f}", f"{search_time:.4f}", f"{phase2_time:.4f}", total_sols, unique_sols,
                 nodes_visited, pruned_nodes
             ])
         print(f"  > [Logged] Experiment results saved to '{filename}'")
@@ -144,7 +144,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
     try:
         extender = CodeExtender(n=n, k=k, q=q, target_weights=target_weights)
         # 확장 모드일 경우 base_code 정보 전달
-        solutions, nodes_visited, pruned_nodes, lp_calls = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
+        solutions, nodes_visited, pruned_nodes, lp_calls, precomp_time, search_time = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
         
     except ImportError:
          print("  > [Error] 'gurobipy' is not installed. Please run 'pip install gurobipy'.")
@@ -154,11 +154,11 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
         return
     end_ilp = time.time()
     ilp_time = end_ilp - start_ilp
-    print(f"  > Phase 1 finished in {ilp_time:.4f}s. Found {len(solutions)} candidate solution(s).")
+    print(f"  > Phase 1 finished in {ilp_time:.4f}s (Precomp: {precomp_time:.4f}s, Search: {search_time:.4f}s). Found {len(solutions)} candidate solution(s).")
 
     if not solutions:
         print("\n[*] No solutions found. The code with the given parameters likely does not exist.")
-        save_experiment_results(n, k, q, target_weights, num_points, ilp_time, 0.0, 0, 0, nodes_visited, pruned_nodes)
+        save_experiment_results(n, k, q, target_weights, num_points, precomp_time, search_time, 0.0, 0, 0, nodes_visited, pruned_nodes)
         return
 
     # --- 단계 3: 해 검증 및 동형성 필터링 (Phase 2) ---
@@ -188,7 +188,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
     print("\nClassification finished.")
     
     # 결과 파일 저장
-    save_experiment_results(n, k, q, target_weights, num_points, ilp_time, phase2_time, len(solutions), len(unique_solutions), nodes_visited, pruned_nodes)
+    save_experiment_results(n, k, q, target_weights, num_points, precomp_time, search_time, phase2_time, len(solutions), len(unique_solutions), nodes_visited, pruned_nodes)
     
     return unique_solutions, points # 다음 확장을 위해 반환
 

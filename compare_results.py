@@ -22,7 +22,8 @@ def load_results(filepath, is_baseline=False):
                     k = int(row['k'])
                     q = int(row['q'])
                     weights = row['Weights']
-                    time_taken = float(row['Phase1_Time'])
+                    pre_time = float(row['Phase0_Time'])
+                    search_time = float(row['Phase1_Time'])
                     nodes = int(row.get('Nodes_Visited', 0))
                     pruned = int(row.get('Pruned_Nodes', 0))
                     status = "Feasible" if int(row['Total_Solutions']) > 0 else "Infeasible"
@@ -32,7 +33,8 @@ def load_results(filepath, is_baseline=False):
                     k = int(row['Dimension(k)'])
                     q = int(row['Field(q)'])
                     weights = row['Target_Weights']
-                    time_taken = float(row['Search_Time(s)'])
+                    pre_time = float(row.get('Precomp_Time(s)', 0.0))
+                    search_time = float(row['Search_Time(s)'])
                     nodes = int(row.get('Nodes_Visited', 0))
                     pruned = int(row.get('Pruned_Nodes', 0))
                     status = row['Existence_Status']
@@ -43,7 +45,8 @@ def load_results(filepath, is_baseline=False):
                 
                 # 최신 실험 결과로 덮어쓰기 (같은 파라미터 실험이 여러 번일 경우)
                 data[key] = {
-                    'time': time_taken,
+                    'pre_time': pre_time,
+                    'search_time': search_time,
                     'nodes': nodes,
                     'pruned': pruned,
                     'status': status
@@ -90,7 +93,8 @@ def main():
     with open(output_csv, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow([
-            "n", "k", "q", "Weights", 
+            "n", "k", "q", "Weights",
+            "Base_Pre(s)", "Trial2_Pre(s)", "Base_Search(s)", "Trial2_Search(s)",
             "Baseline_Time(s)", "Trial2_Time(s)", "Time_Diff(s)", "Speedup(x)",
             "Baseline_Nodes", "Trial2_Nodes", "Nodes_Diff",
             "Baseline_Pruned", "Trial2_Pruned", "Pruned_Diff",
@@ -102,8 +106,14 @@ def main():
             base = baseline_data.get(key, {})
             trial = trial2_data.get(key, {})
 
-            b_time = base.get('time', 'N/A')
-            t_time = trial.get('time', 'N/A')
+            b_pre = base.get('pre_time', 0.0)
+            b_search = base.get('search_time', 0.0)
+            t_pre = trial.get('pre_time', 0.0)
+            t_search = trial.get('search_time', 0.0)
+            
+            b_total = b_pre + b_search if base else 'N/A'
+            t_total = t_pre + t_search if trial else 'N/A'
+            
             b_nodes = base.get('nodes', 'N/A')
             t_nodes = trial.get('nodes', 'N/A')
             b_pruned = base.get('pruned', 'N/A')
@@ -112,12 +122,18 @@ def main():
             t_status = trial.get('status', 'N/A')
 
             # 계산 가능한 경우 차이 계산
-            time_diff = f"{b_time - t_time:.4f}" if isinstance(b_time, float) and isinstance(t_time, float) else "N/A"
-            speedup = f"{b_time / t_time:.2f}" if isinstance(b_time, float) and isinstance(t_time, float) and t_time > 0 else "N/A"
+            time_diff = f"{b_total - t_total:.4f}" if isinstance(b_total, float) and isinstance(t_total, float) else "N/A"
+            speedup = f"{b_total / t_total:.2f}" if isinstance(b_total, float) and isinstance(t_total, float) and t_total > 0 else "N/A"
             nodes_diff = b_nodes - t_nodes if isinstance(b_nodes, int) and isinstance(t_nodes, int) else "N/A"
             pruned_diff = b_pruned - t_pruned if isinstance(b_pruned, int) and isinstance(t_pruned, int) else "N/A"
 
-            writer.writerow([n, k, q, w, b_time, t_time, time_diff, speedup, b_nodes, t_nodes, nodes_diff, b_pruned, t_pruned, pruned_diff, b_status, t_status])
+            writer.writerow([
+                n, k, q, w, 
+                f"{b_pre:.4f}" if base else "N/A", f"{t_pre:.4f}" if trial else "N/A",
+                f"{b_search:.4f}" if base else "N/A", f"{t_search:.4f}" if trial else "N/A",
+                f"{b_total:.4f}" if base else "N/A", f"{t_total:.4f}" if trial else "N/A",
+                time_diff, speedup, b_nodes, t_nodes, nodes_diff, b_pruned, t_pruned, pruned_diff, b_status, t_status
+            ])
 
     print(f"\n[*] Comparison saved to: {output_csv}")
 

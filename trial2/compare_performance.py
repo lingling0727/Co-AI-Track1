@@ -231,8 +231,9 @@ def run_comparison():
     print("-" * 60)
 
     # CSV Headers aligned with experiment_results.csv + Method column
-    headers = ["Method", "Length(n)", "Dimension(k)", "Field(q)", "Target_Weights", 
-               "Search_Time(s)", "Nodes_Visited", "Pruned_Nodes", "Total_Solutions", "Note"]
+    headers = ["Method", "Length(n)", "Dimension(k)", "Field(q)", "Target_Weights",
+               "Total_Time(s)", "Precomp_Time(s)", "Search_Time(s)",
+               "Nodes_Visited", "Pruned_Nodes", "Total_Solutions", "Note"]
 
     # 1. Run Pure Backtracking (No Pruning)
     print(">>> Running Pure Backtracking (No Pruning)...")
@@ -245,6 +246,8 @@ def run_comparison():
     results.append({
         "Method": "Pure Backtracking",
         "Length(n)": n, "Dimension(k)": k, "Field(q)": q, "Target_Weights": str(list(weights)),
+        "Total_Time(s)": f"{pure_time:.4f}",
+        "Precomp_Time(s)": "0.0000",
         "Search_Time(s)": f"{pure_time:.4f}",
         "Nodes_Visited": pure_nodes,
         "Pruned_Nodes": pure_pruned,
@@ -263,6 +266,8 @@ def run_comparison():
     results.append({
         "Method": "Baseline (Paper)",
         "Length(n)": n, "Dimension(k)": k, "Field(q)": q, "Target_Weights": str(list(weights)),
+        "Total_Time(s)": f"{base_time:.4f}",
+        "Precomp_Time(s)": "0.0000",
         "Search_Time(s)": f"{base_time:.4f}",
         "Nodes_Visited": base_nodes,
         "Pruned_Nodes": base_pruned,
@@ -271,18 +276,20 @@ def run_comparison():
     })
 
     # 3. Run Proposed (Method 1+2)
-    print("\n>>> Running Proposed (All Optimizations)...")
+    print("\n>>> Running Proposed (All Optimizations, Early Exit)...")
     start_time = time.time()
     extender = CodeExtender(n, k, q, weights)
-    # CodeExtender returns (solutions, nodes, pruned)
-    prop_sols, prop_nodes, prop_pruned, prop_lp_calls = extender.build_and_solve(points, hyperplanes)
+    # Call with early_exit=True for fair comparison
+    prop_sols, prop_nodes, prop_pruned, prop_lp_calls, prop_precomp, prop_search = extender.build_and_solve(points, hyperplanes, early_exit=True)
     prop_time = time.time() - start_time
-    print(f"    Done. Time: {prop_time:.4f}s, Nodes: {prop_nodes}, Pruned: {prop_pruned}, LP Calls: {prop_lp_calls}")
+    print(f"    Done. Total Time: {prop_time:.4f}s (Precomp: {prop_precomp:.4f}s, Search: {prop_search:.4f}s), Nodes: {prop_nodes}, Pruned: {prop_pruned}, LP Calls: {prop_lp_calls}")
 
     results.append({
         "Method": "Proposed (All Optimizations)",
         "Length(n)": n, "Dimension(k)": k, "Field(q)": q, "Target_Weights": str(list(weights)),
-        "Search_Time(s)": f"{prop_time:.4f}",
+        "Total_Time(s)": f"{prop_time:.4f}",
+        "Precomp_Time(s)": f"{prop_precomp:.4f}",
+        "Search_Time(s)": f"{prop_search:.4f}",
         "Nodes_Visited": prop_nodes,
         "Pruned_Nodes": prop_pruned,
         "Total_Solutions": len(prop_sols),
