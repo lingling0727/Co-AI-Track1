@@ -2,6 +2,6 @@ n,k,q,Weights,Baseline_Time(s),Trial2_Time(s),Time_Diff(s),Speedup(x),Baseline_N
 3,2,2,[2],N/A,0.0055,N/A,N/A,N/A,14,N/A,N/A,3,N/A,N/A,Feasible
 6,2,5,[5],0.006,N/A,N/A,N/A,0,N/A,N/A,0,N/A,N/A,Feasible,N/A
 7,3,2,"[3,4]",0.0314,0.0176,0.0138,1.78,5,496,-491,0,247,-247,Feasible,Feasible
-8,2,7,[7],0.0062,0.1213,-0.1151,0.05,0,68,-68,0,39,-39,Feasible,Feasible
+8,2,7,[7],0.006,0.0825,-0.0765,0.07,0,256,-256,0,120,-120,Feasible,Feasible
 10,3,2,"[3,8]",0.008,0.0417,-0.0337,0.19,0,8998,-8998,0,792,-792,Infeasible,Infeasible
 10,3,2,"[8,3]",N/A,0.203,N/A,N/A,N/A,8998,N/A,N/A,792,N/A,N/A,Infeasible

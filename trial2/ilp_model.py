@@ -74,6 +74,16 @@ class CodeExtender:
             print("    > [Phase 0.5] Pless Power Moments check failed. Stopping.")
             return [], 0, 0
 
+        # 0.7. Phase 0.5: Hamming Bound Check
+        if not self._check_hamming_bound():
+            print("    > [Phase 0.5] Hamming (Sphere-Packing) Bound check failed. Stopping.")
+            return [], 0, 0, 0
+
+        # 0.8. Phase 0.5: Dual Projective Bound Check
+        if not self._check_dual_projective_bound():
+            print("    > [Phase 0.5] Dual Projective Bound check failed. Stopping.")
+            return [], 0, 0, 0
+
         # 1. Build Sparse Incidence Map (Method 1 Preparation)
         # geometry.py의 get_incidence_matrix는 dense matrix를 반환하므로 sparse 형태로 변환
         # point_to_hyperplanes[p_idx] = [h_idx1, h_idx2, ...]
@@ -242,6 +252,56 @@ class CodeExtender:
         except Exception as e:
             print(f"    > [Pless Moments] Error: {e}")
             return True
+
+    def _check_hamming_bound(self):
+        """
+        Checks the Hamming (sphere-packing) bound.
+        q^(n-k) >= sum_{i=0 to t} C(n,i) * (q-1)^i, where t = floor((d-1)/2)
+        """
+        if not self.target_weights:
+            return True
+        
+        d = min(self.target_weights)
+        t = math.floor((d - 1) / 2)
+        
+        if t < 0:
+            return True
+
+        try:
+            sphere_volume = 0
+            for i in range(t + 1):
+                # math.comb(n, k) is available in Python 3.8+
+                term = math.comb(self.n, i) * ((self.q - 1)**i)
+                sphere_volume += term
+            
+            if self.q**(self.n - self.k) < sphere_volume:
+                print(f"    > [Hamming Bound] FAILED. For [n={self.n}, k={self.k}, d={d}]_q={self.q}, q^(n-k)={self.q**(self.n - self.k)} is smaller than sphere volume={sphere_volume}.")
+                return False
+        except (ValueError, OverflowError) as e:
+            # Binomial coefficient can be very large. If it fails, we can't check.
+            print(f"    > [Hamming Bound] Warning: Could not compute bound due to large numbers: {e}")
+        
+        return True
+
+    def _check_dual_projective_bound(self):
+        """
+        Checks the Griesmer bound on the dual code, assuming the code is projective (d_perp >= 3).
+        This provides another lower bound on n.
+        """
+        if self.k >= self.n: # Dual dimension must be positive
+            return True
+            
+        d_perp = 3
+        dual_k = self.n - self.k
+        
+        # Apply Griesmer to dual code [n, n-k, d_perp=3]
+        griesmer_sum_dual = sum(math.ceil(d_perp / (self.q ** i)) for i in range(dual_k))
+        
+        if self.n < griesmer_sum_dual:
+            print(f"    > [Dual Projective Bound] FAILED. Assuming d_perp>=3, for dual code [n={self.n}, k'={dual_k}]_q={self.q}, length must be >= {griesmer_sum_dual}.")
+            return False
+            
+        return True
 
     def _init_persistent_lp_model(self, points, incidence_matrix):
         """
