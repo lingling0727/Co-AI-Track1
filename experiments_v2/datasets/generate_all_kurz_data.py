@@ -123,15 +123,24 @@ class KurzDatasetGenerator:
         단위 벡터들을 찾아 하한값(u_p)을 1로 설정함.
         """
         print("  bounds.json 생성 중...")
+        bounds_data = self._create_bounds_dict(points, k, GF)
+        
+        filepath = os.path.join(output_dir, "bounds.json")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(bounds_data, f, indent=4, ensure_ascii=False)
+        print(f"  경계값 파일을 {filepath}에 저장함.")
+
+    def _create_bounds_dict(self, points: np.ndarray, k: int, GF: galois.Field) -> Dict[str, Any]:
+        """
+        메모리 내에서 경계값 딕셔너리를 생성함.
+        """
         num_points = len(points)
         lower_bounds = [0] * num_points
         
-        # k개의 표준 기저 벡터(e_i)의 인덱스를 찾음.
         unit_vectors = GF.Identity(k)
         unit_vector_indices = []
         
         for uv in unit_vectors:
-            # 정렬된 점 목록에서 단위 벡터의 위치를 찾음.
             idx_tuple = np.where(np.all(points == uv, axis=1))
             if idx_tuple[0].size > 0:
                 idx = idx_tuple[0][0]
@@ -140,16 +149,77 @@ class KurzDatasetGenerator:
             else:
                 print(f"  경고: 단위 벡터 {uv}를 점 집합에서 찾을 수 없음.")
 
-        bounds_data = {
+        return {
             "comment": f"{k}개의 단위 벡터를 고정하여 체계적인 형태 G=[I_k|A]를 강제함.",
             "unit_vector_indices": sorted(unit_vector_indices),
             "lower_bounds": lower_bounds
         }
+
+    def _generate_config_json(self, params: Dict[str, Any], output_dir: str):
+        """
+        O(1) 조회가 가능한 용량(capacity) 조회 맵과 가분성(delta) 정보가 포함된 config.json 파일을 생성함.
+        """
+        print("  config.json 생성 중...")
+        config_data = self._create_config_dict(params)
         
-        filepath = os.path.join(output_dir, "bounds.json")
+        filepath = os.path.join(output_dir, "config.json")
         with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(bounds_data, f, indent=4, ensure_ascii=False)
-        print(f"  경계값 파일을 {filepath}에 저장함.")
+            json.dump(config_data, f, indent=4, ensure_ascii=False)
+        print(f"  설정 파일을 {filepath}에 저장함.")
+
+    def _create_config_dict(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        메모리 내에서 설정 딕셔너리를 생성함.
+        """
+        n = params['n']
+        w_set = params.get('w_set', set())
+        
+        # S_H = n - w, 여기서 w는 허용된 가중치 집합의 원소
+        allowed_capacities: Set[int] = {n - w for w in w_set}
+        
+        # O(1) 조회를 위한 불리언 맵 생성. 리스트의 인덱스가 용량을 나타냄.
+        capacity_lookup = [i in allowed_capacities for i in range(n + 1)]
+        
+        return {
+            "q": params['q'],
+            "k": params['k'],
+            "n": params['n'],
+            "d_min": params['d'],
+            "w_set": list(w_set),
+            "delta": params.get("delta", 1),
+            "allowed_capacities_s_h": sorted(list(allowed_capacities)),
+            "capacity_lookup": capacity_lookup
+        }
+
+    def generate_data_in_memory(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        단일 프로포지션에 대한 데이터셋을 파일 저장 없이 메모리에서 직접 생성함.
+        """
+        prop_name = params.get("name", "in-memory")
+        print(f"\n--- {prop_name}에 대한 인메모리 데이터 생성 시작 ---")
+        
+        q, k = params['q'], params['k']
+        
+        GF = galois.GF(q)
+        
+        points = self._generate_points(k, q, GF)
+        
+        incidence_packed, point_to_hypers = self._generate_incidence_matrix(points, GF)
+        
+        config_data = self._create_config_dict(params)
+        
+        bounds_data = self._create_bounds_dict(points, k, GF)
+        
+        print(f"--- {prop_name} 인메모리 생성 완료 ---")
+        
+        return {
+            "points": points.astype(np.int8),
+            "incidence_packed": incidence_packed,
+            "point_to_hypers": point_to_hypers,
+            "config": config_data,
+            "bounds": bounds_data,
+            "params": params
+        }
 
     def generate_dataset(self, params: Dict[str, Any]):
         """

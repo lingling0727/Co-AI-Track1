@@ -1,0 +1,5 @@
+Proposition,Solver,Time(s),Nodes,Pruned,Solutions
+prop1,HiGHS(MIP),300.2293,Internal,N/A,0
+prop2,HiGHS(MIP),300.0815,Internal,N/A,0
+prop3,HiGHS(MIP),4.2479,Internal,N/A,1
+prop4,HiGHS(MIP),3.9262,Internal,N/A,1
