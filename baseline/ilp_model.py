@@ -94,6 +94,10 @@ class CodeExtender:
                     if val > 0.5:
                         sol[j] = int(round(val))
                 solutions.append(sol)
+            
+            # [Info] NodeCount가 0인 경우 사용자에게 이유를 알림
+            if model.NodeCount == 0:
+                print("    > [Gurobi] Solved during presolve or at root node (NodeCount=0).")
         
         # Return format: solutions, nodes_visited, pruned_nodes
         # Gurobi doesn't give "pruned_nodes" in the same sense as backtracking, 

@@ -94,7 +94,7 @@ def save_experiment_results(n, k, q, weights, num_points, ilp_time, phase2_time,
 
             writer.writerow([
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                n, k, q, str(list(weights)), num_points,
+                n, k, q, str(sorted(list(weights))), num_points,
                 status, f"{ilp_time:.4f}", f"{phase2_time:.4f}", total_sols, unique_sols,
                 nodes_visited, pruned_nodes
             ])
@@ -144,7 +144,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
     try:
         extender = CodeExtender(n=n, k=k, q=q, target_weights=target_weights)
         # 확장 모드일 경우 base_code 정보 전달
-        solutions, nodes_visited, pruned_nodes = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
+        solutions, nodes_visited, pruned_nodes, lp_calls = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
         
     except ImportError:
          print("  > [Error] 'gurobipy' is not installed. Please run 'pip install gurobipy'.")

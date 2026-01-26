@@ -1,0 +1,13 @@
+# Projective Geometry PG(1, 7)
+# Dimension k: 2, Field size q: 7
+# Total Points: 8
+# Format: Point_ID: (coord1, coord2, ...)
+----------------------------------------
+0: (0, 1)
+1: (1, 0)
+2: (1, 1)
+3: (1, 2)
+4: (1, 3)
+5: (1, 4)
+6: (1, 5)
+7: (1, 6)

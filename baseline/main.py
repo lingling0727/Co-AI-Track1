@@ -42,23 +42,47 @@ def save_experiment_results(n, k, q, weights, num_points, phase0_time, phase1_ti
     실험 결과를 CSV 파일로 저장합니다.
     """
     filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment_results.csv")
+    
+    # 정의된 헤더
+    headers = [
+        "Timestamp", "n", "k", "q", "Weights", "Points",
+        "Phase0_Time", "Phase1_Time", "Phase2_Time", "Existence_Status",
+        "Total_Solutions", "Unique_Solutions", "Nodes_Visited", "Pruned_Nodes"
+    ]
+
     file_exists = os.path.isfile(filename)
+    should_write_header = False
+    
+    if file_exists:
+        try:
+            with open(filename, 'r', newline='', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                try:
+                    existing_headers = next(reader)
+                    if existing_headers != headers:
+                        should_write_header = True
+                        file_exists = False # 헤더가 다르면 덮어쓰기 모드로 전환
+                except StopIteration:
+                    should_write_header = True # 파일이 비어있음
+        except Exception:
+            should_write_header = True
+            file_exists = False
+    else:
+        should_write_header = True
+
+    mode = 'a' if file_exists else 'w'
     
     try:
-        with open(filename, mode='a', newline='', encoding='utf-8') as f:
+        with open(filename, mode=mode, newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            # 파일이 처음 생성될 때만 헤더 작성
-            if not file_exists:
-                writer.writerow([
-                    "Timestamp", "n", "k", "q", "Weights", "Points",
-                    "Phase0_Time", "Phase1_Time", "Phase2_Time", "Existence_Status",
-                    "Total_Solutions", "Unique_Solutions", "Nodes_Visited", "Pruned_Nodes"
-                ])
+            
+            if should_write_header:
+                writer.writerow(headers)
             
             status = "Feasible" if total_sols > 0 else "Infeasible"
             writer.writerow([
                 datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                n, k, q, str(list(weights)), num_points,
+                n, k, q, str(sorted(list(weights))), num_points,
                 f"{phase0_time:.4f}", f"{phase1_time:.4f}", f"{phase2_time:.4f}", status, total_sols, unique_sols, nodes_visited, pruned_nodes
             ])
         print(f"  > [Logged] Experiment results saved to '{filename}'")

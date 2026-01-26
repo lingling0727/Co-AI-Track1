@@ -152,7 +152,7 @@ class BaselineSolver:
                     
                     for h in range(self.num_hyperplanes):
                         k_curr = current_k_values[h]
-                        future_k_expr = gp.quicksum(x[j] for j in range(start_idx, self.num_points) if self.incidence[j][h] == 1)
+                        future_k_expr = gp.quicksum(x[j] for j in range(start_idx, self.num_points) if self.incidence[h][j] == 1)
                         
                         model.addConstr(k_curr + future_k_expr >= min_k)
                         model.addConstr(k_curr + future_k_expr <= max_k)
@@ -197,9 +197,27 @@ class BaselineSolver:
 
 # --- 2. Comparison Runner ---
 def run_comparison():
-    # Test Parameters: [7, 3, 2] Hamming Code
+    # 기본 파라미터 (Default)
     n, k, q = 7, 3, 2
     weights = {3, 4}
+
+    # 커맨드 라인 인자가 있으면 덮어쓰기
+    if len(sys.argv) >= 4:
+        try:
+            n = int(sys.argv[1])
+            k = int(sys.argv[2])
+            q = int(sys.argv[3])
+            if len(sys.argv) >= 5:
+                weights_str = sys.argv[4]
+                # "3,4" 또는 "[3,4]" 형태 처리
+                weights_str = weights_str.replace('[', '').replace(']', '').replace('"', '')
+                weights = set(map(int, weights_str.split(',')))
+            print(f"[*] Using custom parameters: n={n}, k={k}, q={q}, weights={weights}")
+        except ValueError:
+            print("[!] Invalid arguments. Using default parameters.")
+    else:
+        print(f"[*] Using default parameters: n={n}, k={k}, q={q}, weights={weights}")
+        print("    (To use custom parameters: python compare_performance.py <n> <k> <q> <weights>)")
     
     print(f"[*] Generating Geometry for PG({k-1}, {q})...")
     points = generate_projective_points(k, q)
@@ -253,22 +271,22 @@ def run_comparison():
     })
 
     # 3. Run Proposed (Method 1+2)
-    print("\n>>> Running Proposed (Method 1: Watched + Method 2: RCUB)...")
+    print("\n>>> Running Proposed (All Optimizations)...")
     start_time = time.time()
     extender = CodeExtender(n, k, q, weights)
     # CodeExtender returns (solutions, nodes, pruned)
-    prop_sols, prop_nodes, prop_pruned = extender.build_and_solve(points, hyperplanes)
+    prop_sols, prop_nodes, prop_pruned, prop_lp_calls = extender.build_and_solve(points, hyperplanes)
     prop_time = time.time() - start_time
-    print(f"    Done. Time: {prop_time:.4f}s, Nodes: {prop_nodes}, Pruned: {prop_pruned}")
+    print(f"    Done. Time: {prop_time:.4f}s, Nodes: {prop_nodes}, Pruned: {prop_pruned}, LP Calls: {prop_lp_calls}")
 
     results.append({
-        "Method": "Proposed (Method 1+2)",
+        "Method": "Proposed (All Optimizations)",
         "Length(n)": n, "Dimension(k)": k, "Field(q)": q, "Target_Weights": str(list(weights)),
         "Search_Time(s)": f"{prop_time:.4f}",
         "Nodes_Visited": prop_nodes,
         "Pruned_Nodes": prop_pruned,
         "Total_Solutions": len(prop_sols),
-        "Note": "RCUB Pruning"
+        "Note": f"All optimizations incl. LP Pruning (Calls: {prop_lp_calls})"
     })
 
     # Save to CSV
