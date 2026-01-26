@@ -24,6 +24,7 @@ def load_results(filepath, is_baseline=False):
                     weights = row['Weights']
                     time_taken = float(row['Phase1_Time'])
                     nodes = int(row.get('Nodes_Visited', 0))
+                    pruned = int(row.get('Pruned_Nodes', 0))
                     status = "Feasible" if int(row['Total_Solutions']) > 0 else "Infeasible"
                 else:
                     # Trial2 Header: Length(n), Dimension(k), Field(q), Target_Weights, Search_Time(s), Nodes_Visited
@@ -33,6 +34,7 @@ def load_results(filepath, is_baseline=False):
                     weights = row['Target_Weights']
                     time_taken = float(row['Search_Time(s)'])
                     nodes = int(row.get('Nodes_Visited', 0))
+                    pruned = int(row.get('Pruned_Nodes', 0))
                     status = row['Existence_Status']
                 
                 # 키 생성 (Weights 문자열 포맷이 다를 수 있으니 공백 제거 후 비교)
@@ -43,6 +45,7 @@ def load_results(filepath, is_baseline=False):
                 data[key] = {
                     'time': time_taken,
                     'nodes': nodes,
+                    'pruned': pruned,
                     'status': status
                 }
             except KeyError as e:
@@ -90,6 +93,7 @@ def main():
             "n", "k", "q", "Weights", 
             "Baseline_Time(s)", "Trial2_Time(s)", "Time_Diff(s)", "Speedup(x)",
             "Baseline_Nodes", "Trial2_Nodes", "Nodes_Diff",
+            "Baseline_Pruned", "Trial2_Pruned", "Pruned_Diff",
             "Baseline_Status", "Trial2_Status"
         ])
 
@@ -102,6 +106,8 @@ def main():
             t_time = trial.get('time', 'N/A')
             b_nodes = base.get('nodes', 'N/A')
             t_nodes = trial.get('nodes', 'N/A')
+            b_pruned = base.get('pruned', 'N/A')
+            t_pruned = trial.get('pruned', 'N/A')
             b_status = base.get('status', 'N/A')
             t_status = trial.get('status', 'N/A')
 
@@ -109,8 +115,9 @@ def main():
             time_diff = f"{b_time - t_time:.4f}" if isinstance(b_time, float) and isinstance(t_time, float) else "N/A"
             speedup = f"{b_time / t_time:.2f}" if isinstance(b_time, float) and isinstance(t_time, float) and t_time > 0 else "N/A"
             nodes_diff = b_nodes - t_nodes if isinstance(b_nodes, int) and isinstance(t_nodes, int) else "N/A"
+            pruned_diff = b_pruned - t_pruned if isinstance(b_pruned, int) and isinstance(t_pruned, int) else "N/A"
 
-            writer.writerow([n, k, q, w, b_time, t_time, time_diff, speedup, b_nodes, t_nodes, nodes_diff, b_status, t_status])
+            writer.writerow([n, k, q, w, b_time, t_time, time_diff, speedup, b_nodes, t_nodes, nodes_diff, b_pruned, t_pruned, pruned_diff, b_status, t_status])
 
     print(f"\n[*] Comparison saved to: {output_csv}")
 

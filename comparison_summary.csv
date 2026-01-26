@@ -1,3 +1,4 @@
 n,k,q,Weights,Baseline_Time(s),Trial2_Time(s),Time_Diff(s),Speedup(x),Baseline_Nodes,Trial2_Nodes,Nodes_Diff,Baseline_Status,Trial2_Status
 3,2,2,[2],N/A,0.0055,N/A,N/A,N/A,14,N/A,N/A,Feasible
-7,3,2,"[3,4]",0.011,0.0076,0.0034,1.45,5,1036,-1031,Feasible,Feasible
+6,2,5,[5],0.006,N/A,N/A,N/A,0,N/A,N/A,Feasible,N/A
+7,3,2,"[3,4]",0.0134,0.0076,0.0058,1.76,5,1036,-1031,Feasible,Feasible

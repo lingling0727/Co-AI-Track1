@@ -1,2 +1,3 @@
 Timestamp,Length(n),Dimension(k),Field(q),Target_Weights,Num_Points,Existence_Status,Search_Time(s),Verify_Time(s),Total_Solutions,Unique_Solutions,Nodes_Visited,Pruned_Nodes
-2026-01-25 21:51:48,7,3,2,"[3, 4]",7,Feasible,0.0110,0.0010,1,1,5,0
+2026-01-25 22:39:16,7,3,2,"[3, 4]",7,Feasible,0.0096,0.0015,1,1,5,0
+2026-01-25 22:43:49,6,2,5,[5],6,Feasible,0.0063,0.0000,1,1,0,0

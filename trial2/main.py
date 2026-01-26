@@ -4,6 +4,12 @@ import os
 import csv
 import datetime
 
+# [수정] 모듈 경로 설정: trial2 폴더에서 실행 시 상위 폴더(루트)의 모듈을 찾도록 경로 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
+
 try:
     # 같은 디렉토리에 있는 모듈들을 import 합니다.
     from geometry import generate_projective_points, generate_hyperplanes
@@ -11,6 +17,7 @@ try:
     from checker import verify_solution, filter_isomorphic_solutions
 except ImportError as e:
     print(f"Error: Could not import necessary modules.")
+    print(f"Debug: Python is searching in these paths: {sys.path}")
     print(f"Details: {e}")
     sys.exit(1)
 
@@ -18,10 +25,11 @@ def save_geometry_data(k, q, points):
     """
     생성된 기하학적 데이터를 텍스트 파일로 저장합니다.
     """
-    directory = "dataset"
+    # [수정] 파일 저장 경로를 현재 스크립트 위치 기준으로 명확히 지정
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dataset")
     if not os.path.exists(directory):
         os.makedirs(directory)
-    
+
     filename = os.path.join(directory, f"geometry_k{k}_q{q}.txt")
     
     try:
@@ -41,8 +49,9 @@ def save_experiment_results(n, k, q, weights, num_points, ilp_time, phase2_time,
     """
     실험 결과를 CSV 파일로 저장합니다.
     """
-    filename = "experiment_results.csv"
-    
+    # [수정] 파일 저장 경로를 현재 스크립트 위치 기준으로 명확히 지정
+    filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment_results.csv")
+
     # 정의된 헤더
     headers = [
         "Timestamp", "Length(n)", "Dimension(k)", "Field(q)", "Target_Weights", "Num_Points",
@@ -138,7 +147,7 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
         solutions, nodes_visited, pruned_nodes = extender.build_and_solve(points, hyperplanes, base_code_counts, points_km1)
         
     except ImportError:
-         print("  > [Error] 'ortools' is not installed. Please run 'pip install ortools'.")
+         print("  > [Error] 'gurobipy' is not installed. Please run 'pip install gurobipy'.")
          return
     except Exception as e:
         print(f"  > [Error] An error occurred during ILP solving: {e}")
