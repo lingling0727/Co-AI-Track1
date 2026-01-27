@@ -30,7 +30,7 @@ class CodeExtender:
     def build_and_solve(self, points, hyperplanes, base_code_counts=None, points_km1=None):
         if not GUROBI_AVAILABLE:
             print("  > [Error] 'gurobipy' is not installed.")
-            return [], 0, 0, 0.0, 0.0
+            return [], 0, 0, 0.0, 0.0, "Gurobi_Not_Found"
 
         incidence_matrix = get_incidence_matrix(points, hyperplanes, self.q)
 
@@ -40,19 +40,24 @@ class CodeExtender:
         if not self._check_phase0_gurobi(points, incidence_matrix):
             print("    > [Phase 0] Infeasible. Stopping.")
             phase0_time = time.time() - start_p0
-            return [], 0, 0, phase0_time, 0.0
+            return [], 0, 0, phase0_time, 0.0, "Infeasible_Phase0"
         phase0_time = time.time() - start_p0
 
         # --- Phase 1: Full Enumeration ---
         start_p1 = time.time()
         print("    > [Phase 1] Starting Gurobi search...")
-        solutions, nodes = self._solve_gurobi(points, incidence_matrix, base_code_counts, points_km1)
+        solutions, nodes, status_code = self._solve_gurobi(points, incidence_matrix, base_code_counts, points_km1)
         phase1_time = time.time() - start_p1
         
         self.solutions = solutions
         self.nodes_visited = nodes
         
-        return self.solutions, self.nodes_visited, 0, phase0_time, phase1_time
+        if status_code == GRB.OPTIMAL: status_str = "Optimal"
+        elif status_code == GRB.SOLUTION_LIMIT: status_str = "Solution_Limit"
+        elif status_code == GRB.TIME_LIMIT: status_str = "Time_Limit"
+        else: status_str = "Feasible" if solutions else "Infeasible"
+        
+        return self.solutions, self.nodes_visited, 0, phase0_time, phase1_time, status_str
 
     def _check_phase0_gurobi(self, points, incidence_matrix):
         try:
@@ -112,8 +117,8 @@ class CodeExtender:
                     sol = {j: int(round(x[j].Xn)) for j in range(len(points)) if x[j].Xn > 0.5}
                     solutions.append(sol)
             
-            return solutions, int(model.NodeCount)
+            return solutions, int(model.NodeCount), model.Status
             
         except Exception as e:
             print(f"      > Gurobi Error in Baseline Solve: {e}")
-            return [], 0
+            return [], 0, -1

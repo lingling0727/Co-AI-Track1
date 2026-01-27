@@ -7,7 +7,7 @@ try:
 except ImportError:
     GUROBI_AVAILABLE = False
 
-from geometry import get_incidence_matrix, generate_linear_group, get_orbits
+from geometry import get_incidence_matrix, generate_gl_generators, get_orbits
 
 class CodeExtender:
     def __init__(self, n, k, q, target_weights):
@@ -43,14 +43,14 @@ class CodeExtender:
         # (Gurobi가 없으면 실행 불가하므로 체크)
         if not GUROBI_AVAILABLE:
             print("    > [Error] Gurobi not found. Cannot run optimized search.")
-            return [], 0, 0, 0, 0, 0, 0
+            return [], 0, 0, 0, 0, 0, 0, "Gurobi_Not_Found"
 
         start_time = time.time()
         print("    > [Phase 0] Running Gurobi feasibility check...")
         if not self._check_phase0_gurobi(points, incidence_matrix):
             print("    > [Phase 0] Infeasible. Stopping.")
             phase0_time = time.time() - start_time
-            return [], 0, 0, phase0_time, phase0_5_time, phase1_5_prep_time, search_time
+            return [], 0, 0, phase0_time, phase0_5_time, phase1_5_prep_time, search_time, "Infeasible_Phase0"
         phase0_time = time.time() - start_time
         
         # --- Phase 0.5: Theoretical Bounds Check ---
@@ -59,7 +59,7 @@ class CodeExtender:
         if not self._phase_0_5_checks():
             print("    > [Phase 0.5] Failed. Stopping.")
             phase0_5_time = time.time() - start_time
-            return [], 0, 0, phase0_time, phase0_5_time, phase1_5_prep_time, search_time
+            return [], 0, 0, phase0_time, phase0_5_time, phase1_5_prep_time, search_time, "Infeasible_Phase0.5"
         phase0_5_time = time.time() - start_time
         
         # --- Phase 1.5: Symmetry Breaking (Orbital Branching) ---
@@ -70,7 +70,7 @@ class CodeExtender:
             start_time = time.time()
             print("    > [Phase 1.5] Generating orbits for symmetry breaking...")
             try:
-                matrices = generate_linear_group(self.k, self.q, limit=2000)
+                matrices = generate_gl_generators(self.k, self.q)
                 # get_orbits가 (reps, orbits_dict)를 반환한다고 가정 (geometry.py 확인 필요)
                 # 현재 geometry.py의 get_orbits는 reps만 반환하므로, orbits_dict를 얻도록 수정하거나
                 # 여기서는 reps만 있어도 되는지 확인. -> Orbital Branching을 하려면 Orbit 전체 목록이 필요함.
@@ -99,6 +99,7 @@ class CodeExtender:
         # --- Phase 1: Gurobi Search with Orbital Branching ---
         print("    > [Phase 1] Starting Gurobi search...")
         search_start = time.time()
+        final_status = "Unknown"
         
         if rep_indices and not base_code_counts:
             # Orbital Branching: 각 궤도의 대표점에 대해 Gurobi를 개별 실행
@@ -116,6 +117,8 @@ class CodeExtender:
             # 주의: 단순히 x[rep] >= 1 만 걸면, 다른 궤도의 점들이 섞여 나올 때 중복이 발생할 수 있음.
             # 하지만 Baseline보다는 확실히 탐색 공간을 쪼개는 효과가 있음.
             
+            status_set = set()
+            
             for i, r_idx in enumerate(rep_indices):
                 # 이번 분기: r_idx 점을 반드시 포함 (x >= 1)
                 # 그리고 이전 대표점들은 포함하지 않음 (x = 0) -> 이를 위해서는 궤도 전체를 알아야 함.
@@ -127,25 +130,42 @@ class CodeExtender:
                 
                 print(f"      > Branch {i+1}/{len(rep_indices)}: Force x_{forced_index} >= 1, Forbid previous reps")
                 
-                sub_solutions, sub_nodes = self._solve_gurobi(points, incidence_matrix, 
+                sub_solutions, sub_nodes, sub_status = self._solve_gurobi(points, incidence_matrix, 
                                                             forced_index=forced_index, 
                                                             forbidden_indices=forbidden_indices,
                                                             base_code_counts=base_code_counts,
                                                             points_km1=points_km1)
                 self.solutions.extend(sub_solutions)
                 self.nodes_visited += sub_nodes
+                status_set.add(sub_status)
                 
                 # 만약 충분한 해를 찾았다면 조기 종료 가능 (옵션)
+            
+            # 상태 결정 로직
+            if GRB.SOLUTION_LIMIT in status_set:
+                final_status = "Solution_Limit"
+            elif GRB.TIME_LIMIT in status_set:
+                final_status = "Time_Limit"
+            elif GRB.OPTIMAL in status_set:
+                final_status = "Optimal"
+            else:
+                final_status = "Feasible" if self.solutions else "Infeasible"
+
         else:
             # 기본 Gurobi 실행 (Symmetry Breaking 없이)
-            sub_solutions, sub_nodes = self._solve_gurobi(points, incidence_matrix, 
+            sub_solutions, sub_nodes, sub_status = self._solve_gurobi(points, incidence_matrix, 
                                                         base_code_counts=base_code_counts,
                                                         points_km1=points_km1)
             self.solutions.extend(sub_solutions)
             self.nodes_visited += sub_nodes
+            
+            if sub_status == GRB.OPTIMAL: final_status = "Optimal"
+            elif sub_status == GRB.SOLUTION_LIMIT: final_status = "Solution_Limit"
+            elif sub_status == GRB.TIME_LIMIT: final_status = "Time_Limit"
+            else: final_status = "Feasible" if self.solutions else "Infeasible"
         
         search_time = time.time() - search_start
-        return self.solutions, self.nodes_visited, self.pruned_nodes, phase0_time, phase0_5_time, phase1_5_prep_time, search_time
+        return self.solutions, self.nodes_visited, self.pruned_nodes, phase0_time, phase0_5_time, phase1_5_prep_time, search_time, final_status
 
     def _solve_gurobi(self, points, incidence_matrix, forced_index=None, forbidden_indices=None, base_code_counts=None, points_km1=None):
         """
@@ -156,6 +176,9 @@ class CodeExtender:
             model.setParam('OutputFlag', 0)
             model.setParam(GRB.Param.PoolSearchMode, 2)
             model.setParam(GRB.Param.PoolSolutions, 2000000)
+            # [Optimization] Gurobi Tuning
+            model.setParam('Symmetry', 2)  # Aggressive symmetry breaking
+            model.setParam('Presolve', 2)  # Aggressive presolve
             
             x = model.addVars(len(points), vtype=GRB.INTEGER, lb=0, ub=self.n, name="x")
             
@@ -186,10 +209,14 @@ class CodeExtender:
                 for p_idx in hyperplane_indices[h_idx]:
                     expr.add(x[p_idx])
                 
-                # z 변수를 사용하여 Disjunction 구현: expr == k1 OR expr == k2 ...
-                z = model.addVars(allowed_k, vtype=GRB.BINARY, name=f"z_{h_idx}")
-                model.addConstr(z.sum() == 1)
-                model.addConstr(expr == gp.quicksum(k * z[k] for k in allowed_k))
+                # [Optimization] If only one allowed k, use direct constraint (Huge speedup for fixed-weight codes)
+                if len(allowed_k) == 1:
+                    model.addConstr(expr == allowed_k[0], name=f"H_{h_idx}")
+                else:
+                    # z 변수를 사용하여 Disjunction 구현: expr == k1 OR expr == k2 ...
+                    z = model.addVars(allowed_k, vtype=GRB.BINARY, name=f"z_{h_idx}")
+                    model.addConstr(z.sum() == 1)
+                    model.addConstr(expr == gp.quicksum(k * z[k] for k in allowed_k))
 
             # 4. 확장 제약 (Extension)
             if base_code_counts and points_km1:
@@ -202,7 +229,8 @@ class CodeExtender:
             model.optimize()
             
             solutions = []
-            if model.Status == GRB.OPTIMAL:
+            # OPTIMAL 또는 SOLUTION_LIMIT(해를 찾다가 멈춤) 상태 모두 처리
+            if model.Status in [GRB.OPTIMAL, GRB.SOLUTION_LIMIT]:
                 n_solutions = model.SolCount
                 for i in range(n_solutions):
                     model.setParam(GRB.Param.SolutionNumber, i)
@@ -211,12 +239,15 @@ class CodeExtender:
                         val = int(round(x[j].Xn))
                         if val > 0: sol[j] = val
                     solutions.append(sol)
+                
+                if model.NodeCount == 0:
+                    print("      > [Gurobi] Solved at root node (Presolve Success).")
             
-            return solutions, int(model.NodeCount)
+            return solutions, int(model.NodeCount), model.Status
             
         except Exception as e:
             print(f"      > Gurobi Error: {e}")
-            return [], 0
+            return [], 0, -1
 
     def _phase_0_5_checks(self):
         """

@@ -20,7 +20,7 @@ def save_geometry_data(k, q, points):
         f.write(f"# PG({k-1}, {q}) - {len(points)} points\n")
         for idx, p in enumerate(points): f.write(f"{idx}: {p}\n")
 
-def save_experiment_results(n, k, q, weights, num_points, phase0_time, phase0_5_time, phase1_5_prep_time, search_time, phase2_time, total_sols, unique_sols, nodes_visited, pruned_nodes):
+def save_experiment_results(n, k, q, weights, num_points, phase0_time, phase0_5_time, phase1_5_prep_time, search_time, phase2_time, total_sols, unique_sols, nodes_visited, pruned_nodes, status):
     filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "experiment_results.csv")
     headers = [
         "Timestamp", "n", "k", "q", "Weights", "Points",
@@ -52,7 +52,6 @@ def save_experiment_results(n, k, q, weights, num_points, phase0_time, phase0_5_
     with open(filename, mode=mode, newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         if should_write_header: writer.writerow(headers)
-        status = "Feasible" if total_sols > 0 else "Infeasible"
         writer.writerow([
             datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             n, k, q, str(sorted(list(weights))), num_points,
@@ -84,7 +83,7 @@ def run_classification(n, k, q, weights_str):
     # [2] Phase 0, 0.5, 1, 1.5
     print("\n[2] Phase 0~1.5: Enumeration with Enhanced Pruning...")
     extender = CodeExtender(n, k, q, target_weights)
-    solutions, nodes, pruned, p0_time, p0_5_time, p1_5_prep_time, p1_search_time = extender.build_and_solve(points, hyperplanes)
+    solutions, nodes, pruned, p0_time, p0_5_time, p1_5_prep_time, p1_search_time, solve_status = extender.build_and_solve(points, hyperplanes)
     
     print(f"  > Enumeration finished.")
     print(f"  > Phase 0 (ILP Feasibility): {p0_time:.4f}s")
@@ -92,9 +91,10 @@ def run_classification(n, k, q, weights_str):
     print(f"  > Phase 1.5 (Symmetry Prep): {p1_5_prep_time:.4f}s")
     print(f"  > Phase 1 (Backtrack Search): {p1_search_time:.4f}s")
     print(f"  > Candidates found: {len(solutions)}")
+    print(f"  > Solver Status: {solve_status}")
 
     if not solutions:
-        save_experiment_results(n, k, q, target_weights, len(points), p0_time, p0_5_time, p1_5_prep_time, p1_search_time, 0.0, 0, 0, nodes, pruned)
+        save_experiment_results(n, k, q, target_weights, len(points), p0_time, p0_5_time, p1_5_prep_time, p1_search_time, 0.0, 0, 0, nodes, pruned, solve_status)
         return
 
     # [3] Phase 2: Verification
@@ -112,7 +112,7 @@ def run_classification(n, k, q, weights_str):
         print(f"  #{i+1}: {sol}")
     if len(unique) > 5: print(f"  ... {len(unique)-5} more.")
 
-    save_experiment_results(n, k, q, target_weights, len(points), p0_time, p0_5_time, p1_5_prep_time, p1_search_time, phase2_time, len(solutions), len(unique), nodes, pruned)
+    save_experiment_results(n, k, q, target_weights, len(points), p0_time, p0_5_time, p1_5_prep_time, p1_search_time, phase2_time, len(solutions), len(unique), nodes, pruned, solve_status)
 
 if __name__ == "__main__":
     if len(sys.argv) == 5:

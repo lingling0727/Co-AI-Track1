@@ -11,6 +11,7 @@ class GaloisField:
         self.inv_table = {}
         if not self.is_prime:
             self._init_tables()
+        self.primitive = self._find_primitive_element()
 
     def _is_prime(self, n):
         if n <= 1: return False
@@ -58,6 +59,19 @@ class GaloisField:
                             break
             else:
                 raise NotImplementedError(f"GF({self.q}) is not supported yet.")
+
+    def _find_primitive_element(self):
+        if self.q == 2: return 1
+        for a in range(2, self.q):
+            curr = a
+            order = 1
+            while order < self.q - 1:
+                curr = self.mul(curr, a)
+                if curr == 1: break
+                order += 1
+            if order == self.q - 1:
+                return a
+        return 1
 
     def add(self, a, b):
         if self.is_prime: return (a + b) % self.q
@@ -149,23 +163,39 @@ def is_independent(vectors, q):
         pivot_row += 1
     return pivot_row == len(vectors)
 
-def generate_linear_group(k, q, limit=5000):
-    gl_order = 1
-    for i in range(k): gl_order *= (q**k - q**i)
+def generate_gl_generators(k, q):
+    gf = get_gf(q)
+    generators = []
     
-    if gl_order <= limit:
-        return _generate_full_gl(k, q)
-    
-    diag_order = (q-1)**k
-    if diag_order <= limit:
-        return _generate_diagonal_group(k, q)
+    # 1. Scalar multiplication of the first row by a primitive element
+    if q > 2:
+        prim = gf.primitive
+        mat = [[0]*k for _ in range(k)]
+        for i in range(k): mat[i][i] = 1
+        mat[0][0] = prim
+        generators.append(mat)
         
-    return _generate_scalar_group(k, q)
+    if k >= 2:
+        # 2. Elementary matrix E_{1,2}(1)
+        mat = [[0]*k for _ in range(k)]
+        for i in range(k): mat[i][i] = 1
+        mat[0][1] = 1
+        generators.append(mat)
+        
+        # 3. Cyclic permutation
+        mat = [[0]*k for _ in range(k)]
+        for i in range(k-1):
+            mat[i][i+1] = 1
+        mat[k-1][0] = 1
+        generators.append(mat)
+        
+    return generators
 
 def _generate_full_gl(k, q):
     matrices = []
     all_vectors = list(itertools.product(range(q), repeat=k))
     nonzero_vectors = [v for v in all_vectors if any(x != 0 for x in v)]
+    gf = get_gf(q)
     def backtrack(current_rows):
         if len(current_rows) == k:
             matrices.append([list(r) for r in current_rows])
@@ -175,6 +205,16 @@ def _generate_full_gl(k, q):
                 backtrack(current_rows + [v])
     backtrack([])
     return matrices
+
+def generate_linear_group(k, q, limit=5000):
+    gl_order = 1
+    for i in range(k): gl_order *= (q**k - q**i)
+    
+    if gl_order <= limit:
+        return _generate_full_gl(k, q)
+    
+    # Fallback or other groups logic can remain here if needed
+    return _generate_diagonal_group(k, q)
 
 def _generate_diagonal_group(k, q):
     matrices = []
@@ -192,20 +232,28 @@ def _generate_scalar_group(k, q):
         matrices.append(matrix)
     return matrices
 
-def get_orbits(points, matrices, q):
+def get_orbits(points, generators, q):
     gf = get_gf(q)
     visited = set()
     representatives = []
     for p in points:
         if p in visited: continue
         representatives.append(p)
+        
         stack = [p]
+        visited.add(p)
+        
         while stack:
             curr = stack.pop()
-            if curr in visited: continue
-            visited.add(curr)
-            for mat in matrices:
-                next_vec = mat_vec_mul(mat, curr, gf)
-                next_p = tuple(gf.mul(x, gf.inv(next((v for v in next_vec if v!=0), 1))) for x in next_vec) if any(next_vec) else next_vec
-                if next_p not in visited: stack.append(next_p)
+            for gen in generators:
+                next_vec = mat_vec_mul(gen, curr, gf)
+                if all(x == 0 for x in next_vec): continue
+                
+                first_nonzero = next((x for x in next_vec if x != 0), None)
+                inv = gf.inv(first_nonzero)
+                next_p = tuple(gf.mul(x, inv) for x in next_vec)
+                
+                if next_p not in visited: 
+                    visited.add(next_p)
+                    stack.append(next_p)
     return representatives
