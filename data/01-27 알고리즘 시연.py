@@ -55,8 +55,12 @@ class IsomorphismChecker:
         # Codewords 생성: C = m * G
         codewords = messages @ G
         
+        # [수정됨] Galois Array를 일반 Numpy 배열로 변환
+        # galois 라이브러리 특성상 직접 count_nonzero를 하면 bool 변환 에러가 발생할 수 있음
+        codewords_np = np.array(codewords)
+        
         # Hamming Weight 계산 (0이 아닌 성분의 개수)
-        weights = np.count_nonzero(codewords, axis=1)
+        weights = np.count_nonzero(codewords_np, axis=1)
         
         # 분포 카운팅 (예: {0:1, 3:10, 4:16 ...})
         dist = {}
