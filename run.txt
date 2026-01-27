@@ -1,10 +1,10 @@
 지금까지 추가된 모든 최적화 기법들을 요약하고, 각각 어떤 종류의 문제에서 가장 효과적인지 설명해 줘
 
-python baseline/main.py 10 2 9 "9"
-python trial3/main.py 6 3 3 "3"
+python baseline/main.py 34 3 8 "28,32"
+python trial3/main.py 34 3 8 "28,32"
 python compare_results.py
 python trial2/compare_performance.py 15 4 2 "8"
-
+13458
         1.     7 3 2 "4"
         2.     15 4 2 "8"
         3.     4 2 3 "3"
@@ -15,6 +15,7 @@ python trial2/compare_performance.py 15 4 2 "8"
         8.     10 2 9 "9"
         9.     34 3 8 "28,32"
         10.    65 3 4 "48,56"
+        11.    35 4 8 "28,32"
 
 
 
