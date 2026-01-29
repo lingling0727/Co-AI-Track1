@@ -4,6 +4,9 @@ import os
 import csv
 import datetime
 
+import threading
+import psutil
+
 try:
     # 같은 디렉토리에 있는 모듈들을 import 합니다.
     from geometry import generate_projective_points, generate_hyperplanes
@@ -13,6 +16,54 @@ except ImportError as e:
     print(f"Error: Could not import necessary modules.")
     print(f"Details: {e}")
     sys.exit(1)
+
+def get_memory_usage_mb():
+    """현재 프로세스의 메모리 사용량을 MB 단위로 반환합니다."""
+    process = psutil.Process(os.getpid())
+    # rss (Resident Set Size)는 실제 사용 중인 물리 메모리 양입니다.
+    return process.memory_info().rss / (1024 * 1024)
+
+def monitor_and_log_memory(log_filename, time_limit_sec, interval_sec):
+    """
+    별도 스레드에서 실행될 함수입니다.
+    주기적으로 메모리 사용량을 모니터링하고 기록합니다.
+    제한 시간이 지나면 프로그램을 강제 종료합니다.
+    """
+    start_time = time.time()
+    
+    headers = ["Timestamp", "Elapsed_Time_sec", "Memory_Usage_MB"]
+    try:
+        with open(log_filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+    except IOError as e:
+        print(f"  > [Monitor Error] Log file could not be written: {e}")
+        return
+
+    print(f"  > [Monitor] Started. Logging every {interval_sec}s for {time_limit_sec}s.")
+
+    # 설정된 간격으로 제한 시간 동안 기록
+    num_intervals = time_limit_sec // interval_sec # 예: 3600s / 60s = 60번 기록
+    for i in range(num_intervals):
+        time.sleep(interval_sec)
+        
+        elapsed_time = time.time() - start_time
+        mem_usage = get_memory_usage_mb()
+        
+        try:
+            with open(log_filename, 'a', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    f"{elapsed_time:.2f}",
+                    f"{mem_usage:.2f}"
+                ])
+            print(f"  > [Monitor] Logged memory: {mem_usage:.2f} MB at {elapsed_time:.0f}s")
+        except IOError as e:
+            print(f"  > [Monitor Error] Failed to log memory: {e}")
+
+    print(f"  > [Monitor] Time limit of ~{time_limit_sec}s reached. Terminating process.")
+    os._exit(0) # 정리 작업 없이 강제 종료
 
 def save_geometry_data(k, q, points):
     """
@@ -89,10 +140,32 @@ def save_experiment_results(n, k, q, weights, num_points, phase0_time, phase1_ti
     except Exception as e:
         print(f"  > [Error] Failed to save experiment results: {e}")
 
-def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=None):
+def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=None, memory_monitoring=False):
     """
     주어진 파라미터로 선형 부호 분류를 수행하는 메인 함수
     """
+    # --- Memory Monitoring Setup ---
+    #  확장(extension)이 아닌 첫 실행일 경우에만 스레드 시작
+    if memory_monitoring and base_code_counts is None:
+        time_limit_sec = 60 * 60  # 60분
+        interval_sec = 1 * 60   # 1분
+        
+        log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "memory_logs")
+        if not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        
+        clean_weights_str = weights_str.replace(",", "-")
+        log_filename = os.path.join(log_dir, f"mem_baseline_{n}_{k}_{q}_{clean_weights_str}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.csv")
+
+        print(f"\n[*] Starting memory monitoring (limit: {time_limit_sec}s, interval: {interval_sec}s)")
+        print(f"  > Log file: {log_filename}")
+        
+        monitor_thread = threading.Thread(
+            target=monitor_and_log_memory,
+            args=(log_filename, time_limit_sec, interval_sec),
+            daemon=True)
+        monitor_thread.start()
+
     try:        
         target_weights = set(map(int, weights_str.split(',')))
     except ValueError:
@@ -193,9 +266,16 @@ def run_classification(n, k, q, weights_str, base_code_counts=None, points_km1=N
 
 
 if __name__ == "__main__":
+    args = sys.argv[1:]
+    memory_monitoring = False
+    if "--monitor" in args:
+        memory_monitoring = True
+        args.remove("--monitor")
+        print("[*] Memory monitoring enabled.")
+
     # --- 논문 재현 테스트 케이스 ---
     # 사용자가 인자를 주지 않았을 때 논문의 케이스를 실행
-    if len(sys.argv) == 1:
+    if len(args) == 0:
         print("No arguments provided. Running Paper Replication Test Cases...\n")
         
         # Case 1: Proposition 2 Replication
@@ -203,27 +283,27 @@ if __name__ == "__main__":
         # 이를 확인하기 위해 먼저 [n, 3]_8 코드를 찾고 확장 시도 (시간 관계상 바로 4차원 시도)
         # 주의: 8은 소수가 아니므로 geometry.py가 수정되어야 정확히 동작함 (현재는 소수체 가정)
         # 여기서는 논문의 Proposition 1 (q=4) 테스트
-        
+
         # Test: [6, 3, 4]_2 (Hamming-like) -> Extension to [7, 4, 4]_2 (Simplex)
         # 작은 스케일로 확장 로직 검증
         print(">>> Test Case: Extending [3, 2]_2 to [7, 3]_2 (Hamming Code Construction)")
         
         # 1. k=2 (Line)
         # n=3, k=2, q=2, weights={2} (Simplex code)
-        sols_k2, points_k2 = run_classification(n=3, k=2, q=2, weights_str="2")
+        sols_k2, points_k2 = run_classification(n=3, k=2, q=2, weights_str="2", memory_monitoring=memory_monitoring)
         
         if sols_k2:
             base_sol = sols_k2[0] # 첫 번째 해를 기반으로 확장
             print("\n>>> Extending the found [3, 2]_2 code to k=3...")
             # 2. k=3 (Plane)
             # Target: n=7, k=3, q=2, weights={3, 4} (Hamming)
-            run_classification(n=7, k=3, q=2, weights_str="3,4", base_code_counts=base_sol, points_km1=points_k2)
+            run_classification(n=7, k=3, q=2, weights_str="3,4", base_code_counts=base_sol, points_km1=points_k2, memory_monitoring=memory_monitoring)
             
-    elif len(sys.argv) == 5:
-        n_param, k_param, q_param, weights_param = sys.argv[1:]
-        run_classification(int(n_param), int(k_param), int(q_param), weights_param)
+    elif len(args) == 4:
+        n_param, k_param, q_param, weights_param = args
+        run_classification(int(n_param), int(k_param), int(q_param), weights_param, memory_monitoring=memory_monitoring)
     else:
-        print("Usage: python src/main.py <n> <k> <q> <weights>")
-        print("Example: python src/main.py 7 3 2 \"3,4\"")
+        print("Usage: python baseline/main.py [--monitor] <n> <k> <q> <weights>")
+        print("Example: python baseline/main.py --monitor 7 3 2 \"3,4\"")
         print("\nRunning with default example: [n=7, k=3, q=2], weights={3,4}")
-        run_classification(n=7, k=3, q=2, weights_str="3,4")
+        run_classification(n=7, k=3, q=2, weights_str="3,4", memory_monitoring=memory_monitoring)
